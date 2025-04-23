@@ -878,8 +878,8 @@ cleanup <- function() {
   # writeLines(t(final[,c("name","seq")]), fileconn)
   # close(fileconn)
   lx("Library succesfully created.")
-  unlink("loop1", recursive = TRUE)
-  unlink("loop2", recursive = TRUE)
+  unlink("loop_1", recursive = TRUE)
+  unlink("loop_2", recursive = TRUE)
   unlink("orfs.tbl")
   unlink("pantera_lib_0.fa")
   unlink("segments_candidates.fa")
@@ -896,7 +896,6 @@ cleanup <- function() {
 invisible(tryCatch({get_libs()}, error = function(err) {end_pantera(paste("Installing libs error ->",geterrmessage()))}))
 invisible(tryCatch({opt <- read_pars()}, error = function(err) {end_pantera(paste("Reading parameters error ->",geterrmessage()))}))
 ### Internal globals 
-cons_threshold <- 0.6
 zones_interval <- 60
 zones_interval_overlap <- 30
 current <- getwd()
