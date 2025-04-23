@@ -161,6 +161,8 @@ if (is.null(opt$recover_dir)) {
 }
 
 if (is.null(opt$verbose)) {
+  opt$verbose <- TRUE
+} else {
   opt$verbose <- FALSE
 }
 
@@ -240,7 +242,7 @@ if (is.null(opt$min_edge)) {
 
 if (is.null(opt$flanking)) {
   # min length of mapping flanking sequences to define an SV
-  opt$flanking <- 2000
+  opt$flanking <- 4000
 }
 return(opt)
 }
@@ -876,6 +878,13 @@ cleanup <- function() {
   # writeLines(t(final[,c("name","seq")]), fileconn)
   # close(fileconn)
   lx("Library succesfully created.")
+  unlink("loop1", recursive = TRUE)
+  unlink("loop2", recursive = TRUE)
+  unlink("orfs.tbl")
+  unlink("pantera_lib_0.fa")
+  unlink("segments_candidates.fa")
+  unlink("temp.orfs")
+  unlink("*consensi*")
   lx(paste0(   "\u001b[32;2m",
                "\u263A",
                "\u001b[0m : ","End of process."))
