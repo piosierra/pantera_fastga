@@ -911,5 +911,5 @@ invisible(tryCatch({cluster_results()}, error = function(err) {end_pantera(paste
 invisible(tryCatch({final <- classify_tes()}, error = function(err) {end_pantera(paste("Error Classification ->",geterrmessage()))}))
 invisible(tryCatch({stats_tes()}, error = function(err) {end_pantera(paste("Error Stats ->",geterrmessage()))}))
 invisible(tryCatch({cleanup()}, error = function(err) {end_pantera(paste("Error Cleanning up ->",geterrmessage()))}))
-end_pantera("End of process.")
+
 
