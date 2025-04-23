@@ -136,7 +136,7 @@ read_pars <- function() {
       "paths_quantile", "q", 1, "integer",
       "min_path_len",   "a", 1, "integer",
       "min_edge",       "z", 1, "integer",
-      "rep_factor",     "f", 1, "integer",
+      "flanking",       "f", 1, "integer",
       "dual",           "d", 0, "logical",
       "verbose",        "v", 0, "logical",
       "help",           "h", 0, "logical"),
@@ -238,9 +238,9 @@ if (is.null(opt$min_edge)) {
   opt$min_edge <- 3
 }
 
-if (is.null(opt$rep_factor)) {
-  # Max factor of repeated kmers
-  opt$rep_factor <- 42
+if (is.null(opt$flanking)) {
+  # min length of mapping flanking sequences to define an SV
+  opt$flanking <- 2000
 }
 return(opt)
 }
@@ -349,7 +349,7 @@ lx <- function(x) {
 get_segments <- function(segments_unique) {
   ## Extract unique segments
     lx(paste("Procesing file =", opt$sv_file))
-    system(paste0("svfind -f 8000 -a hapa -b hapb ", opt$sv_file))
+    system(paste0("svfind -f ", opt$flanking, " -a hapa -b hapb ", opt$sv_file))
     segmentsa <- ffastasv("hapa")
     segmentsb <- ffastasv("hapb")
     segments <- rbind(segmentsa,segmentsb)
@@ -386,17 +386,18 @@ init_pantera <- function() {
              recursive = T)
   sink(paste0(opt$output_folder, "/pantera.log"), split = opt$verbose)
 lx(paste("pantera", pantera_version, "\n"))
-## Confirm mafft is available
-# mafft_exec <- system("which mafft", intern = TRUE)
-# if (length(grep("mafft", mafft_exec)) > 0) {
-#   lx(paste("mafft exec:", mafft_exec))
-# } else {
-#   lx("mafft not found")
-#   stop()
-# }
+
+## Confirm dependencies are available
 if (!(nchar(Sys.which("mafft")) > 0)) {
   end_pantera("mafft not found")
 }
+if (!(nchar(Sys.which("getorf")) > 0)) {
+  end_pantera("getorf not found")
+}
+if (!(nchar(Sys.which("blastn")) > 0)) {
+  end_pantera("blastn not found")
+}
+
 if (!file.exists(file.path(this.dir(), "model/xgbmodel_typesnames_fix"))) {
   end_pantera("Model not found.")
 }
@@ -474,7 +475,7 @@ find_repeats <- function() {
             #   })
             sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
             set2clus <- DNAStringSet(sg_seq$seq)
-            list_clust <- data.table(Clusterize(set2clus, cutoff = 0.2, verbose = F, processors = 1))
+            list_clust <- data.table(Clusterize(set2clus, cutoff = 0.1, verbose = F, processors = 1, minCoverage = 0.8))
             list_clust[,name:= sg_seq$name]
             good_clust <- list_clust[,.N,cluster][N>=opt$min_cl]
           
@@ -567,7 +568,7 @@ cluster_results <- function() {
               sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
            
               set2clus <- DNAStringSet(sg_seq$seq)
-              list_clust <- data.table(Clusterize(set2clus, cutoff = 0.3, verbose = F, processors = 1))
+              list_clust <- data.table(Clusterize(set2clus, cutoff = 0.2, verbose = F, processors = 1, minCoverage = 0.8))
               list_clust[,name:= sg_seq$name]
               
               #    lx(paste("# of clusters ", start, "-", end, ":", length(unique(good_clust))))
