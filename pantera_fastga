@@ -161,8 +161,6 @@ if (is.null(opt$recover_dir)) {
 }
 
 if (is.null(opt$verbose)) {
-  opt$verbose <- TRUE
-} else {
   opt$verbose <- FALSE
 }
 
@@ -197,12 +195,12 @@ if (is.null(opt$max_size)) {
 
 if (is.null(opt$identity)) {
   # Minimum identity for clustering
-  opt$identity <- 0.97
+  opt$identity <- 0.03
 }
 
 if (is.null(opt$identity2)) {
   # Minimum identity for clustering
-  opt$identity2 <- 0.95
+  opt$identity2 <- 0.05
 }
 
 if (is.null(opt$min_cl)) {
@@ -477,7 +475,7 @@ find_repeats <- function() {
             #   })
             sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
             set2clus <- DNAStringSet(sg_seq$seq)
-            list_clust <- data.table(Clusterize(set2clus, cutoff = 0.1, verbose = F, processors = 1, minCoverage = 0.8))
+            list_clust <- data.table(Clusterize(set2clus, cutoff = opt$identity, verbose = F, processors = 1, minCoverage = 0.8))
             list_clust[,name:= sg_seq$name]
             good_clust <- list_clust[,.N,cluster][N>=opt$min_cl]
           
@@ -570,7 +568,7 @@ cluster_results <- function() {
               sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
            
               set2clus <- DNAStringSet(sg_seq$seq)
-              list_clust <- data.table(Clusterize(set2clus, cutoff = 0.2, verbose = F, processors = 1, minCoverage = 0.8))
+              list_clust <- data.table(Clusterize(set2clus, cutoff = opt$identity2, verbose = F, processors = 1, minCoverage = 0.8))
               list_clust[,name:= sg_seq$name]
               
               #    lx(paste("# of clusters ", start, "-", end, ":", length(unique(good_clust))))
@@ -885,6 +883,9 @@ cleanup <- function() {
   unlink("segments_candidates.fa")
   unlink("temp.orfs")
   unlink("*consensi*")
+  setwd(current)
+  unlink("hapa")
+  unlink("hapb")
   lx(paste0(   "\u001b[32;2m",
                "\u263A",
                "\u001b[0m : ","End of process."))
