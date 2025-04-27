@@ -855,6 +855,7 @@ stats_tes <- function() {
      tes <- tes[!(name %in% LINE_check$qseqid)]
      tes <- tes[!(name %in% LTR_check$qseqid)]
      tes <- tes[!(name %in% te_data_rep[N>100]$qseqid & orf1 < 600)]
+     tes <- tes[!(length > (lente / 2))]
       }
     
 
