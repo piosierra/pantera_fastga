@@ -120,11 +120,11 @@ if (!require("stringi", quietly = TRUE)) {
 read_pars <- function() {
   
   spec <- matrix(
-    c("sv_file",      "g", 1, "character", 
+    c("sv_file",      "1", 1, "character", 
       "output_folder",  "o", 1, "character",
       "recover_dir",    "r", 0, "logical",
       "lib_name",       "b", 1, "character",
-      "cores",          "c", 1, "integer",
+      "cores",          "T", 1, "integer",
       "min_size",       "s", 1, "integer",
       "max_size",       "l", 1, "integer",
       "identity",       "i", 1, "double",
