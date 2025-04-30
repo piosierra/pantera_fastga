@@ -1,21 +1,21 @@
 #!/usr/bin/env Rscript
 
-
-pantera_version <- "0.5.0"
-
 # First version using FastGA data.
 # Improved stats and recovery of TEs
 # Version starting directly from an alignment of two haplotypes
 # Cleaned code. Moved to 0.5. Removed surplus options.
 
-
+pantera_version <- "0.5.0"
 options(warn = 0)
 
+
+###
 ### Find the path of the script and create an Rlibs folder to store the 
-### required libraries. 
+### required libraries if they are missing.
+###
 
 stub <- function() {}
-thisPath <- function() {
+thisPath <- function() {  # Path of the script before this.path (Add source!)
   cmdArgs <- commandArgs(trailingOnly = FALSE)
   if (length(grep("^-f$", cmdArgs)) > 0) {
     # R console option
@@ -35,9 +35,11 @@ thisPath <- function() {
     stop("Cannot find file path")
   }
 }
+
 if (!file.exists(file.path(thisPath(), "Rlibs"))) {
   dir.create(file.path(thisPath(), "Rlibs"))
 }
+
 local({r <- getOption("repos")
 r["CRAN"] <- "https://cran.r-project.org"
 options(repos = r)
@@ -45,6 +47,11 @@ options(repos = r)
 .libPaths(c(file.path(thisPath(), "Rlibs"), .libPaths()))
 
 
+###
+### Auxiliary functions
+###
+
+# Prints log messages
 lx <- function(x) {
   #  g <- gc()
   cat(paste0(
@@ -58,91 +65,89 @@ lx <- function(x) {
   ))
 }
 
-
-### Install the required libraries. Probably I should include some messages.
+# Installs the required libraries. Probably I should include some messages.
 get_libs <- function() {
 
-## Libraries
-if (suppressPackageStartupMessages(!require("this.path", quietly = TRUE))) {
-  lx("Intalling package [this.path]")
-  install.packages("this.path")
-}
-if (suppressPackageStartupMessages(!require("getopt", quietly = TRUE))) {
-  lx("Intalling package [getopt]")
-  install.packages("getopt")
-}
-if (suppressPackageStartupMessages(!require("parallel", quietly = TRUE))) {
-  lx("Intalling package [parallel]")
-  install.packages("parallel")
-}
-if (suppressPackageStartupMessages(!require("ips", quietly = TRUE))) {
-  lx("Intalling package [ips]")
-  install.packages("ips")
-}
-if (suppressPackageStartupMessages(!require("BiocManager", quietly = TRUE))) {
-  lx("Intalling package [BiocManager]")
-  install.packages("BiocManager")
-}
-if (suppressPackageStartupMessages(!require("Biostrings", quietly = TRUE))) {
-  lx("Intalling package [Biostrings]")
-  BiocManager::install("Biostrings")
-}
-if (suppressPackageStartupMessages(!require("DECIPHER", quietly = TRUE))) {
-  lx("Intalling package [DECIPHER]")
-  BiocManager::install("DECIPHER")
-} 
-if (suppressPackageStartupMessages(!require("bioseq", quietly = TRUE))) {
-  lx("Intalling package [bioseq]")
-  BiocManager::install("bioseq")
-}
-if (suppressPackageStartupMessages(!require("ape", quietly = TRUE))) {
-  lx("Intalling package [ape]")
-  install.packages("ape")
-}
-if (suppressPackageStartupMessages(!require("LncFinder", quietly = TRUE))) {
-  lx("Intalling package [LncFinder]")
-  install.packages("LncFinder")
-}
-if (suppressPackageStartupMessages(!require("seqinr", quietly = TRUE))) {
-  lx("Intalling package [seqinr]")
-  install.packages("seqinr")
-}
-if (suppressPackageStartupMessages(!require("purrr", quietly = TRUE))) {
-  lx("Intalling package [purrr]")
-  install.packages("purrr")
-}
-if (suppressPackageStartupMessages(!require("dplyr", quietly = TRUE))) {
-  lx("Intalling package [dplyr]")
-  install.packages("dplyr")
-}
-if (suppressPackageStartupMessages(!require("data.table", quietly = TRUE))) {
-  lx("Intalling package [data.table]")
-  install.packages("data.table")
-}
-if (suppressPackageStartupMessages(!require("xgboost", quietly = TRUE))) {
-  lx("Intalling package [xgboost]")
-  install.packages("xgboost")
-}
-if (!require("stringr", quietly = TRUE)) {
-  lx("Intalling package [stringr]")
-  install.packages("stringr")
-}
-
-if (!require("stringi", quietly = TRUE)) {
-  lx("Intalling package [stringi]")
-  install.packages("stringi")
-}
+  if (suppressPackageStartupMessages(!require("this.path", quietly = TRUE))) {
+    lx("Intalling package [this.path]")
+    install.packages("this.path")
+  }
+  if (suppressPackageStartupMessages(!require("getopt", quietly = TRUE))) {
+    lx("Intalling package [getopt]")
+    install.packages("getopt")
+  }
+  if (suppressPackageStartupMessages(!require("parallel", quietly = TRUE))) {
+    lx("Intalling package [parallel]")
+    install.packages("parallel")
+  }
+  if (suppressPackageStartupMessages(!require("ips", quietly = TRUE))) {
+    lx("Intalling package [ips]")
+    install.packages("ips")
+  }
+  if (suppressPackageStartupMessages(!require("BiocManager", quietly = TRUE))) {
+    lx("Intalling package [BiocManager]")
+    install.packages("BiocManager")
+  }
+  if (suppressPackageStartupMessages(!require("Biostrings", quietly = TRUE))) {
+    lx("Intalling package [Biostrings]")
+    BiocManager::install("Biostrings")
+  }
+  if (suppressPackageStartupMessages(!require("DECIPHER", quietly = TRUE))) {
+    lx("Intalling package [DECIPHER]")
+    BiocManager::install("DECIPHER")
+  } 
+  if (suppressPackageStartupMessages(!require("bioseq", quietly = TRUE))) {
+    lx("Intalling package [bioseq]")
+    BiocManager::install("bioseq")
+  }
+  if (suppressPackageStartupMessages(!require("ape", quietly = TRUE))) {
+    lx("Intalling package [ape]")
+    install.packages("ape")
+  }
+  if (suppressPackageStartupMessages(!require("LncFinder", quietly = TRUE))) {
+    lx("Intalling package [LncFinder]")
+    install.packages("LncFinder")
+  }
+  if (suppressPackageStartupMessages(!require("seqinr", quietly = TRUE))) {
+    lx("Intalling package [seqinr]")
+    install.packages("seqinr")
+  }
+  if (suppressPackageStartupMessages(!require("purrr", quietly = TRUE))) {
+    lx("Intalling package [purrr]")
+    install.packages("purrr")
+  }
+  if (suppressPackageStartupMessages(!require("dplyr", quietly = TRUE))) {
+    lx("Intalling package [dplyr]")
+    install.packages("dplyr")
+  }
+  if (suppressPackageStartupMessages(!require("data.table", quietly = TRUE))) {
+    lx("Intalling package [data.table]")
+    install.packages("data.table")
+  }
+  if (suppressPackageStartupMessages(!require("xgboost", quietly = TRUE))) {
+    lx("Intalling package [xgboost]")
+    install.packages("xgboost")
+  }
+  if (!require("stringr", quietly = TRUE)) {
+    lx("Intalling package [stringr]")
+    install.packages("stringr")
+  }
+  
+  if (!require("stringi", quietly = TRUE)) {
+    lx("Intalling package [stringi]")
+    install.packages("stringi")
+  }
  
 }
 
-### Read parameters for pantera.
+# Reads parameters
 read_pars <- function() {
   
   spec <- matrix(
     c("sv_file",        "1", 1, "character",   # 1aln input file [required]
       "output_folder",  "o", 1, "character", # Output foder [pantera_output]
       "lib_name",       "b", 1, "character", # Name to append to the output sequences [pantera]
-      "cores",          "T", 1, "integer",   # Number of threads [all]
+      "threads",        "T", 1, "integer",   # Number of threads [all]
       "min_size",       "s", 1, "integer",   # Min size of polymorphic sequences to investigate [200]
       "max_size",       "l", 1, "integer",   # Max size of polymorphic sequences to investigate [20000]
       "identity",       "i", 1, "double",    # Cutoff (as distance) to cluster in first pass [0.03]
@@ -157,95 +162,81 @@ read_pars <- function() {
     byrow = TRUE, ncol = 4)
   
   opt <- getopt(spec)
-## Read args
-
-
-
-if (!is.null(opt$help)) {
-  cat(gsub("\\] \\[","\\]\n\\[",getopt(spec, usage = TRUE)))
-  q(status = 1)
+  if (!is.null(opt$help)) {
+    cat(gsub("\\] \\[","\\]\n\\[",getopt(spec, usage = TRUE)))
+    q(status = 1)
+  }
+  
+  if (is.null(opt$log_file)) {
+    opt$log_file <- FALSE
+  }
+  
+  if (is.null(opt$verbose)) {
+    opt$verbose <- FALSE
+  }
+  
+  if (is.null(opt$sv_file)) {
+    stop("[--svfile|-1] missing")
+   }
+  
+  if (is.null(opt$output_folder)) {
+    opt$output_folder <- "pantera_output"
+  }
+  
+  if (is.null(opt$lib_name)) {
+    opt$lib_name <- "pantera"
+  }
+  
+  if (is.null(opt$threads)) {
+    opt$threads <- detectCores()
+  } else {
+    opt$threads <- min(opt$threads, detectCores())
+  }
+  
+  if (is.null(opt$min_size)) {
+    opt$min_size <- 200
+  }
+  
+  if (is.null(opt$max_size)) {
+    opt$max_size <- 20000
+  }
+  
+  if (is.null(opt$identity)) {
+    opt$identity <- 0.03
+  }
+  
+  if (is.null(opt$identity2)) {
+    opt$identity2 <- 0.05
+  }
+  
+  if (is.null(opt$min_cl)) {
+    opt$min_cl <- 2
+  }
+  
+  if (is.null(opt$Ns)) {
+    # Maximum percentage of Ns in segment.
+    opt$Ns <- 0
+  }
+  
+  if (is.null(opt$cl_size)) {
+    # Maximum size of cluster to process
+    opt$cl_size <- 200
+  }
+  
+  if (is.null(opt$flanking)) {
+    # min length of mapping flanking sequences to define an SV
+    opt$flanking <- 4000
+  }
+  return(opt)
 }
 
-if (is.null(opt$log_file)) {
-  opt$log_file <- FALSE
-}
-
-if (is.null(opt$verbose)) {
-  opt$verbose <- FALSE
-}
-
-if (is.null(opt$sv_file)) {
-  stop("[--svfile|-1] missing")
- }
-
-if (is.null(opt$output_folder)) {
-  opt$output_folder <- "pantera_output"
-}
-
-if (is.null(opt$lib_name)) {
-  opt$lib_name <- "pantera"
-}
-
-if (is.null(opt$cores)) {
-  # Cores
-  opt$cores <- detectCores()
-} else {
-  opt$cores <- min(opt$cores, detectCores())
-}
-
-if (is.null(opt$min_size)) {
-  # Minimum size of TE
-  opt$min_size <- 200
-}
-
-if (is.null(opt$max_size)) {
-  # Maximum size of TE
-  opt$max_size <- 20000
-}
-
-if (is.null(opt$identity)) {
-  # Minimum identity for clustering
-  opt$identity <- 0.03
-}
-
-if (is.null(opt$identity2)) {
-  # Minimum identity for clustering
-  opt$identity2 <- 0.05
-}
-
-if (is.null(opt$min_cl)) {
-  # Minimum number of segments to create a consensus
-  opt$min_cl <- 2
-}
-
-if (is.null(opt$Ns)) {
-  # Maximum percentage of Ns in segment.
-  opt$Ns <- 0
-}
-
-if (is.null(opt$cl_size)) {
-  # Maximum size of cluster to process
-  opt$cl_size <- 200
-}
-
-if (is.null(opt$flanking)) {
-  # min length of mapping flanking sequences to define an SV
-  opt$flanking <- 4000
-}
-return(opt)
-}
-
-### Function to read a fasta file
-
+# Reads a fasta file
 ffasta <- function(f) {
   check <- file.size(f)
   if (check == 0 | is.na(check)) {
     return(data.table(name = as.character(), seq = as.character()))
   } else {
-  fa_raw <- fread(f,
-                  header = F,
-                  fill = T,
-                  sep = "\n")
+  fa_raw <- fread(f, header = F, fill = T, sep = "\n")
   fa_raw[, h := grepl(">", V1)]
   fa_oneline <- fa_raw[, .(paste0(V1, collapse = "")), by = rleid(h)]
   return(data.table(name = fa_oneline[rep(c(TRUE, FALSE), length = .N)]$V1, 
@@ -253,6 +244,7 @@ ffasta <- function(f) {
   }
 }
 
+# Reads the two ONEcode files extracted from a 1aln file with svfind
 ffastasv <- function(f) {
   check <- file.size(f)
   if (check == 0 | is.na(check)) {
@@ -269,20 +261,19 @@ ffastasv <- function(f) {
   }
 }
 
+# Reverse complement of a DNA sequence
 rc <- function(s) {
   stri_reverse(chartr("ACGTacgt","TGCAtgca",s))
 }
 
-### Function to write a fasta file
-
+# Writes a fasta file
 wfasta <- function(fasta_data, f) {
   fileconn <- file(f)
   writeLines(t(fasta_data), fileconn)
   close(fileconn)
 }
 
-### End and show message
-
+# End and show message
 end_pantera <- function(message) {
   cat(paste0(
     format(Sys.time(), "%y-%m-%d:%H:%M:%S"),
@@ -298,8 +289,7 @@ end_pantera <- function(message) {
   quit(save = "no")
 }
 
-### Auxiliary function to convert from dna to binDNA format
-
+# Converts from dna to binDNA format
 reformatDNA <- function(dna) {
   temp <- matrix(as.character(dna),
                  nrow = (length(row.names(dna))),
@@ -311,38 +301,11 @@ reformatDNA <- function(dna) {
 }
 
 
-### Read segments gfa files (fast, does not decomposes bubbles)
+###
+### Main functions 
+###
 
-get_segments <- function(segments_unique) {
-  ## Extract unique segments
-    lx(paste("Procesing file =", opt$sv_file))
-    system(paste0("svfind -f ", opt$flanking, " -a hapa -b hapb ", 
-                  opt$sv_file, "> /dev/null 2>&1"))
-    segmentsa <- ffastasv("hapa")
-    segmentsb <- ffastasv("hapb")
-    segments <- rbind(segmentsa,segmentsb)
-    segments[, len := nchar(seq)]
-    segments <- segments[len >= opt$min_size & len <= opt$max_size]
-    segments[,b:=gsub(".*_","",name)]
-    segments <- segments[order(-len)][,.SD[1],b][,.(name,seq)]
-    segments[,a:=gsub("_.*","",name)]
-    segments <- segments[,.SD[1],a][,.(name,seq)]
-    segments <- segments[,name:=paste0(">",basename(opt$sv_file),
-                                       "_",.I, collapse = ""), by =.I]
-    lx(paste("Number of valid size segments =", nrow(segments)))
-    if (opt$Ns > 0) {
-      segments[, Ns := nchar(segments$seq) - nchar(gsub("N", "", segments$seq))]
-      segments <- segments[Ns <= (len * opt$Ns)]
-      lx(paste("Number of valid Ns segments =", nrow(segments)))
-      segments$Ns <- NULL
-    }
-    segments_unique <- segments[,.(name,seq)]
-    lx(paste("TOTAL number of segments =", nrow(segments_unique)))
-  return(segments_unique)
-}
-
-### Init function
-
+# Init function
 init_pantera <- function() {
   
   dir.create(opt$output_folder,
@@ -371,7 +334,7 @@ if (!file.exists(file.path(this.dir(), "model/xgbmodel_typesnames_fix"))) {
 lx(paste("pantera path:", this.path()))
 lx(paste("Gfas list:", opt$gfas_list))
 lx(paste("Output:", opt$output_folder))
-lx(paste("Cores to use:", opt$cores))
+lx(paste("Threads to use:", opt$threads))
 lx(paste("Cores detected:", detectCores()))
 lx(paste("Min. size:", opt$min_size))
 lx(paste("Max. size:", opt$max_size))
@@ -385,7 +348,37 @@ lx(paste("Minimum size of flanking sequences:", opt$flanking))
 return(0)
 }
 
-read_gfas <- function() {
+# Reads polymorfic segments from an alignment
+get_segments <- function(segments_unique) {
+  ## Extract unique segments
+  lx(paste("Procesing file =", opt$sv_file))
+  system(paste0("svfind -f ", opt$flanking, " -a hapa -b hapb ", 
+                opt$sv_file, "> /dev/null 2>&1"))
+  segmentsa <- ffastasv("hapa")
+  segmentsb <- ffastasv("hapb")
+  segments <- rbind(segmentsa,segmentsb)
+  segments[, len := nchar(seq)]
+  segments <- segments[len >= opt$min_size & len <= opt$max_size]
+  segments[,b:=gsub(".*_","",name)]
+  segments <- segments[order(-len)][,.SD[1],b][,.(name,seq)]
+  segments[,a:=gsub("_.*","",name)]
+  segments <- segments[,.SD[1],a][,.(name,seq)]
+  segments <- segments[,name:=paste0(">",basename(opt$sv_file),
+                                     "_",.I, collapse = ""), by =.I]
+  lx(paste("Number of valid size segments =", nrow(segments)))
+  if (opt$Ns > 0) {
+    segments[, Ns := nchar(segments$seq) - nchar(gsub("N", "", segments$seq))]
+    segments <- segments[Ns <= (len * opt$Ns)]
+    lx(paste("Number of valid Ns segments =", nrow(segments)))
+    segments$Ns <- NULL
+  }
+  segments_unique <- segments[,.(name,seq)]
+  lx(paste("TOTAL number of segments =", nrow(segments_unique)))
+  return(segments_unique)
+}
+
+# Obtains and stores the polymorphic segments
+read_poly <- function() {
   if (!file.exists(paste0("all_segments.fa"))) {
     segments_unique <- get_segments(segments_unique)
     segments_unique[,seq:=toupper(seq)]
@@ -396,8 +389,7 @@ read_gfas <- function() {
 return(segments_unique)  
 }  
 
-### First pass, finds repeats but does not try to generate any consensus  
-
+# First pass, finds repeats but does not try to generate any consensus.  
 find_repeats <- function() {
   process_zone <- function(zone) {
     start <- as.numeric(zone[1]) - zones_interval_overlap
@@ -485,7 +477,7 @@ find_repeats <- function() {
     rev(zones),
     process_zone,
     mc.preschedule = FALSE,
-    mc.cores = opt$cores
+    mc.cores = opt$threads
   )
 
   lx(paste("Total sequences discarded:", sum(as.numeric(unlist(loop_exit)))))
@@ -494,8 +486,7 @@ find_repeats <- function() {
   setwd("..")
 }
 
-### Cluster and generate consensus. Different options than in first pass
-
+# Second pass. Cluster and generate consensus. 
 cluster_results <- function() {
   process_zone_2 <- function(zone) {
     start <- as.numeric(zone[1]) - zones_interval_overlap
@@ -615,28 +606,24 @@ cluster_results <- function() {
         rev(zones),
         process_zone_2,
         mc.preschedule = FALSE,
-        mc.cores = opt$cores
+        mc.cores = opt$threads
       )
       lx(paste("Total sequences discarded:", 
                sum(as.numeric(unlist(loop_exit)))))
       system("cat consen*.fa >> ../all_consensi.fa")
       setwd("..")
     }
-  }
+}
 
+# Classify TE models
 classify_tes <- function() {
   final <- ffasta("all_consensi.fa")
   final[, name := paste0(">", opt$lib_name, "_", 1:nrow(final), 
                          "-", gsub(".*-","",name))]
   wfasta(final, paste0(opt$lib_name, "-consensi.fa"))
   lx(paste("Final consensi: ", nrow(final)))
-  
-  # setwd(current)
-  # setwd(opt$output_folder)
-  
   file <- paste0(opt$lib_name, "-consensi.fa")
   lx("Reading orfs")
-  
   system(
     paste0(
       "getorf -sequence ",
@@ -720,127 +707,113 @@ classify_tes <- function() {
 
 }
 
+# Obtain structural stats from TE models and recover or filter some.
 stats_tes <- function() {
   lx("Stats start")
   tes <- final[, c("name", "seq", "cluster")]
-  
-
-
-  
   file <- paste0(opt$lib_name, "-consensi.fa")
-  
   temp <- paste0("temp",make.names(gsub(".*/","",file)))
   dir.create(temp)
   setwd(temp)
-  
-
-  
-    lente <- nchar(tes$seq)
-    tes$lente <- lente
-    three_orfs <- function(seq) {
-      orfs <- rbindlist(find_orfs(seq, reverse.strand = TRUE, 
-                                  max.only = F), fill = T)
-      orfs_list <- orfs[,first(ORF.Len), ORF.Stop]
-      orfs_list_ordered <- orfs_list[order(-V1)]$V1
-      return(data.table(orf1 = orfs_list_ordered[1],
-                        orf2 = orfs_list_ordered[2],
-                        orf3 = orfs_list_ordered[3]))
-    }
+  lente <- nchar(tes$seq)
+  tes$lente <- lente
+  three_orfs <- function(seq) {
+    orfs <- rbindlist(find_orfs(seq, reverse.strand = TRUE, 
+                                max.only = F), fill = T)
+    orfs_list <- orfs[,first(ORF.Len), ORF.Stop]
+    orfs_list_ordered <- orfs_list[order(-V1)]$V1
+    return(data.table(orf1 = orfs_list_ordered[1],
+                    orf2 = orfs_list_ordered[2],
+                    orf3 = orfs_list_ordered[3]))
+  }
+  orfs_tes <- rbindlist(mclapply(tes$seq,three_orfs))
+  tes <- cbind(tes,orfs_tes)
+  wfasta(tes[, c("name","seq")], paste0("tmp-tes"))
+  system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
+  te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads ", 
+                               opt$threads, 
+                               " -evalue 500 -outfmt 6 -word_size 7 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
+  if (nrow(te_data) > 0) {
+    colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", 
+                          "gapopen","qstart","qend","sstart","send", 
+                          "evalue", "bitscore")
+    te_data_mix <- te_data[qseqid != sseqid]
+    te_data_rep <- te_data[qseqid == sseqid & 
+                             (qstart != sstart | qend != send)][,.N,qseqid]
+    te_data  <- te_data[!(qseqid == sseqid & qstart == sstart & qend == send)]
+    te_data <- te_data[qseqid == sseqid]
+    te_data[,len:=abs(qend-qstart)]
+    te_data <- te_data[order(qstart)][order(-len)]
+    te_data <- merge(te_data, 
+                     tes[,c("name","lente", "orf1", "orf2", "orf3")]
+                     [,name:=gsub(">","",name)], by.x = "qseqid", by.y="name")
+    te_data[,lgap:=.(min(qstart,qend,sstart,send)-1), by=1:nrow(te_data)]
+    te_data[,rgap:=.(lente-max(qstart,qend,sstart,send)), by=1:nrow(te_data)]
     
-    orfs_tes <- rbindlist(mclapply(tes$seq,three_orfs))
-    tes <- cbind(tes,orfs_tes)
-    
-    # lx(paste("Stats for:", te$name))
-    wfasta(tes[, c("name","seq")], paste0("tmp-tes"))
-    system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
-    # -word_size 11 -gapopen 5 -gapextend 2 -reward 2 -penalty -3
-    ### CHANGE NUM THREADS TO THE OPT PARAMETER!!!
-    te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads 10 -evalue 500 -outfmt 6 -word_size 7 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
-    if (nrow(te_data) > 0) {
-      colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", "gapopen","qstart","qend","sstart","send", "evalue", "bitscore")
-      te_data_mix <- te_data[qseqid != sseqid]
-      te_data_rep <- te_data[qseqid == sseqid & 
-                               (qstart != sstart | qend != send)][,.N,qseqid]
-      te_data  <- te_data[!(qseqid == sseqid & qstart == sstart & qend == send)]
-      te_data <- te_data[qseqid == sseqid]
-      te_data[,len:=abs(qend-qstart)]
-      te_data <- te_data[order(qstart)][order(-len)]
-      te_data <- merge(te_data, 
-                       tes[,c("name","lente", "orf1", "orf2", "orf3")]
-                       [,name:=gsub(">","",name)], by.x = "qseqid", by.y="name")
-      # te_data[,center:=.((min(qstart,qend,sstart,send)+max(qstart,qend,sstart,send))/2), by=rownames(te_data)]
-      te_data[,lgap:=.(min(qstart,qend,sstart,send)-1), by=1:nrow(te_data)]
-      te_data[,rgap:=.(lente-max(qstart,qend,sstart,send)), by=1:nrow(te_data)]
-      
-      te_data[,check:=((qend+qstart-lente)/2) * ((send+sstart-lente)/2)<0, 
-              by=1:nrow(te_data)]  ### Is each match at one side of the center?
-      te_data <- te_data[check==T]
-      te_data[,check_type:=((qend-qstart)*(send-sstart))<0, by=1:nrow(te_data)]
-      te_data[,tgap :=lgap+rgap]
-      te_data <- te_data[order(tgap)][,.SD[1],qseqid]
-      
-      te_data_mix <- merge(te_data_mix, 
-                           tes[,c("name","lente", "orf1", "orf2", "orf3")]
-                           [,name:=gsub(">","",name)], by.x = "qseqid", 
-                                                       by.y="name")
-      te_data_mix <- merge(te_data_mix, 
-                           tes[,c("name","lente", "orf1", "orf2", "orf3")]
-                           [,name:=gsub(">","",name)], by.x = "sseqid", 
-                                                       by.y="name")
-      te_data_mix[,lqgap:=.(min(qstart,qend)-1), by=.I]
-      te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
-      te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
-      te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
-      te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
-      te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
-      ### Is it an LTR or a TIR?
-      # te_data <- te_data[len>40]
-      te_data$type <- "LTR"
-      te_data[check_type==T,type:= "TIR"]
-      
-      
-      te_data[,pass:=T]
-      te_data[grepl("LTR",qseqid) & !grepl("DIRS",qseqid) & 
-              (orf1<1000 | lgap > 20 | rgap > 20 | type != "LTR" |
-               lente < 3000 | lente > 16000), pass:=F]
-      te_data[grepl("LTR",qseqid) & grepl("DIRS",qseqid) & 
-              (orf1<1000 | lgap > 20 | rgap > 20 | type != "TIR" | 
-               lente < 3000 | lente > 16000), pass:=F]
-      te_data[grepl("DNA",qseqid) & (lgap > 20 | rgap > 20 | type != "TIR"), 
-              pass:=F]
-      te_data[grepl("RC",qseqid) & (lente < 4000 |orf1<2000) , pass:=F]
-      te_data[grepl("LINE",qseqid) & (lente < 3500 | lente > 8000 | orf1 < 2000)
-              , pass:=F]
-      
-      tes <- merge(tes[,name:=gsub(">","",name)], 
-                   te_data[,c("qseqid","length","lgap","rgap", "type", "pass")], 
-                            by.x = "name", by.y = "qseqid", all.x=T)
-      tes[grepl("LINE",name) & is.na(pass) & 
-          lente >= 3500 & lente <= 8000 & orf1 >= 2000, pass:=T]
-      tes[is.na(pass), pass :=F]
-      tes[grepl("LINE", name), type :=NA]
-      tes[is.na(type), rgap :=0]
-      tes[is.na(type), lgap :=0]
-      tes[is.na(type), length :=0]
-      
-      LINE_check <-  te_data_mix[sseqid %in% te_data[pass==T & 
-                                grepl("LINE",sseqid)]$sseqid &
-                                !(qseqid %in% te_data[pass==T]$sseqid) &
+    te_data[,check:=((qend+qstart-lente)/2) * ((send+sstart-lente)/2)<0, 
+            by=1:nrow(te_data)]  ### Is each match at one side of the center?
+    te_data <- te_data[check==T]
+    te_data[,check_type:=((qend-qstart)*(send-sstart))<0, by=1:nrow(te_data)]
+    te_data[,tgap :=lgap+rgap]
+    te_data <- te_data[order(tgap)][,.SD[1],qseqid]
+    te_data_mix <- merge(te_data_mix, 
+                         tes[,c("name","lente", "orf1", "orf2", "orf3")]
+                         [,name:=gsub(">","",name)], by.x = "qseqid", 
+                                                     by.y="name")
+    te_data_mix <- merge(te_data_mix, 
+                         tes[,c("name","lente", "orf1", "orf2", "orf3")]
+                         [,name:=gsub(">","",name)], by.x = "sseqid", 
+                                                     by.y="name")
+    te_data_mix[,lqgap:=.(min(qstart,qend)-1), by=.I]
+    te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
+    te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
+    te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
+    te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
+    te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
+    te_data$type <- "LTR"
+    te_data[check_type==T,type:= "TIR"]
+    te_data[,pass:=T]
+    te_data[grepl("LTR",qseqid) & !grepl("DIRS",qseqid) & 
+            (orf1<1000 | lgap > 20 | rgap > 20 | type != "LTR" |
+             lente < 3000 | lente > 16000), pass:=F]
+    te_data[grepl("LTR",qseqid) & grepl("DIRS",qseqid) & 
+            (orf1<1000 | lgap > 20 | rgap > 20 | type != "TIR" | 
+             lente < 3000 | lente > 16000), pass:=F]
+    te_data[grepl("DNA",qseqid) & (lgap > 20 | rgap > 20 | type != "TIR"), 
+            pass:=F]
+    te_data[grepl("RC",qseqid) & (lente < 4000 |orf1<2000) , pass:=F]
+    te_data[grepl("LINE",qseqid) & (lente < 3500 | lente > 8000 | orf1 < 2000),
+            pass:=F]
+    tes <- merge(tes[,name:=gsub(">","",name)], 
+                 te_data[,c("qseqid","length","lgap","rgap", "type", "pass")], 
+                          by.x = "name", by.y = "qseqid", all.x=T)
+    tes[grepl("LINE",name) & is.na(pass) & 
+        lente >= 3500 & lente <= 8000 & orf1 >= 2000, pass:=T]
+    tes[is.na(pass), pass :=F]
+    tes[grepl("LINE", name), type :=NA]
+    tes[is.na(type), rgap :=0]
+    tes[is.na(type), lgap :=0]
+    tes[is.na(type), length :=0]
+    LINE_check <-  te_data_mix[sseqid %in% te_data[pass==T & 
+                               grepl("LINE",sseqid)]$sseqid &
+                               !(qseqid %in% te_data[pass==T]$sseqid) &
+                               ((length-lente.x)^2)<1000]
+    #  DNA_check <-  te_data_mix[sseqid %in% te_data[pass==T & 
+                    # grepl("DNA",sseqid)]$sseqid & qseqid %in% te_data[pass==F 
+                    # & type == "TIR"]$sseqid & (lqgap<20 | rqgap<20)]
+    #  DNA_check2 <-  te_data_mix[sseqid %in% te_data[pass==F & 
+                    # type =="TIR"]$sseqid & qseqid %in% te_data[pass==T 
+                    # & grepl("DNA",sseqid)]$sseqid ]
+    LTR_check <-  te_data_mix[sseqid %in% te_data[pass==T &
+                              grepl("LTR",sseqid)]$sseqid &
+                              !(qseqid %in% te_data[pass==T]$sseqid) &
                                 ((length-lente.x)^2)<1000]
-    #  DNA_check <-  te_data_mix[sseqid %in% te_data[pass==T & grepl("DNA",sseqid)]$sseqid & qseqid %in% te_data[pass==F & type == "TIR"]$sseqid & (lqgap<20 | rqgap<20)]
-    #  DNA_check2 <-  te_data_mix[sseqid %in% te_data[pass==F & type =="TIR"]$sseqid & qseqid %in% te_data[pass==T & grepl("DNA",sseqid)]$sseqid ]
-      LTR_check <-  te_data_mix[sseqid %in% te_data[pass==T &
-                                grepl("LTR",sseqid)]$sseqid &
-                                !(qseqid %in% te_data[pass==T]$sseqid) &
-                                ((length-lente.x)^2)<1000]
-     tes <- tes[!(name %in% LINE_check$qseqid)]
-     tes <- tes[!(name %in% LTR_check$qseqid)]
-     tes <- tes[!(name %in% te_data_rep[N>100]$qseqid & orf1 < 600)]
-     tes <- tes[!(length > (lente / 2))]
-      }
-    
-
-
+    # TODO: Add search for NA LTR.
+    tes <- tes[!(name %in% LINE_check$qseqid)]
+    tes <- tes[!(name %in% LTR_check$qseqid)]
+    tes <- tes[!(name %in% te_data_rep[N>100]$qseqid & orf1 < 600)]
+    tes <- tes[!(length > (lente / 2))]
+  }
   setwd("..")
   unlink(temp, recursive = TRUE)
   tes <- tes[order(-pass,-lente)]
@@ -856,6 +829,7 @@ stats_tes <- function() {
          quote =  F, row.names = F, sep ="\t")
 }
 
+# Remove temp files.
 cleanup <- function() {
   
   lx("Library succesfully created.")
@@ -878,8 +852,10 @@ cleanup <- function() {
 }
 
 
+###
+### MAIN 
+###
 
-### MAIN
 invisible(tryCatch({get_libs()}, error = function(err) {
   end_pantera(paste("Installing libs error ->",geterrmessage()))
   }))
@@ -890,7 +866,7 @@ if (opt$log_file == FALSE) {
   lx <- function(x){return(NULL)}
 }
 
-### Internal globals 
+# Internal globals 
 zones_interval <- 60
 zones_interval_overlap <- 30
 current <- getwd()
@@ -900,10 +876,12 @@ segments_unique <- data.table(name = as.character(),
 invisible(tryCatch({init_pantera()}, error = function(err) {
   end_pantera(paste("Initialization error ->",geterrmessage()))
   }))
-invisible(tryCatch({segments_unique <- read_gfas()}, error = function(err) {
+invisible(tryCatch({segments_unique <- read_poly()}, error = function(err) {
   end_pantera(paste("GFA files missing ->",geterrmessage()))
   }))
+
 setwd(opt$output_folder)
+
 invisible(tryCatch({find_repeats()}, error = function(err) {
   end_pantera(paste("Error round 1 ->",geterrmessage()))
   }))
