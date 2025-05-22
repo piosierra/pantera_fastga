@@ -158,6 +158,7 @@ read_pars <- function() {
       "flanking",       "f", 1, "integer",   # Min length of flanking sequences [4000]
       "verbose",        "v", 0, "logical",   # Show log messages
       "log_file",       "r", 0, "logical",   # Create log file 
+      "debug",          "d", 0, "logical",   # Keep intermediate files.
       "help",           "h", 0, "logical"),  # Show this help 
     byrow = TRUE, ncol = 4)
   
@@ -175,7 +176,10 @@ read_pars <- function() {
     opt$verbose <- FALSE
   }
   
-  if (is.null(opt$sv_file)) {
+  if (is.null(opt$debug)) {
+    opt$debug <- FALSE
+  }
+    if (is.null(opt$sv_file)) {
     stop("[--svfile|-1] missing")
    }
   
@@ -520,7 +524,7 @@ cluster_results <- function() {
               list_clust[,name:= sg_seq$name]
               list_clust[,name:=gsub("_RC","",name)]
               clusters <- list_clust[order(name)][,.(list(name)), cluster]
-              clusters <- clusters[duplicated((clusters$V1))]
+              clusters <- clusters[!duplicated(clusters$V1)]
               clusters[,n:=length(V1[[1]]), by=.I]
               clusters <- clusters[clusters$n>=opt$min_cl,] 
               consensi <- data.table(name = as.character(), 
@@ -541,8 +545,9 @@ cluster_results <- function() {
                              #  thread = 1,
                              exec = "mafft"
                 )
-                cons <- toupper(consensus(as.matrix(reformatDNA(ali)), 
-                                          threshold = cons_threshold))
+                cons <- toupper(consensusString(DNAStringSet(reformatDNA(ali)), 
+                                                ambiguityMap= "-", 
+                                                threshold=0.4))
               } else {
                 cons <- toupper(paste0(unlist(as.character(seqs)), 
                                        collapse = ""))
@@ -568,6 +573,7 @@ cluster_results <- function() {
   opt$Ns <- 0
   zones_interval <- 3000
   zones_interval_overlap <- 0
+  cons_threshold <- 0.6
     segments_unique <- ffasta("segments_candidates.fa")
     if (nrow(segments_unique) > 0) {
       lx(paste("TOTAL Unique segments:", nrow(segments_unique)))
@@ -633,8 +639,9 @@ classify_tes <- function() {
       "/libs/RepeatPeps.lib -outfmt 6 -evalue 1e-10 > orfs.tbl"
     )
   )
-  orfs <- fread("orfs.tbl", header = F)
   lx("Reading data")
+  orfs <- fread("orfs.tbl", header = F)
+  if (nrow(orfs) > 0) {
   types <-
     read.table(file.path(this.dir(), "model/xgbmodel_typesnames_fix"),
                sep = "\n")
@@ -688,12 +695,20 @@ classify_tes <- function() {
     )
   fwrite(result, paste0(file, ".predictions"), sep = "\t")
   
-  lx("Merge")
+  
   result <- fread(paste0(file, ".predictions"))
   result <- result[, name := paste0(">", Name)]
+  }
+  
+  lx("Merge")
   tes <- ffasta(file)
-  final <- merge(tes, result, all.x = T)
-  final[is.na(Prediction), Prediction := "Unknown"]
+  if (exists("result")) {
+    final <- merge(tes, result, all.x = T)
+    final[is.na(Prediction), Prediction := "Unknown"]
+  } else {
+    final <- tes
+    final[,Prediction := "Unknown"]
+  }
   final[, short_Prediction:=  gsub(".*/","",Prediction)]
   final[,ix:=1:.N, by = short_Prediction]
   final[,cluster:=gsub(".*___","",name)]
@@ -811,7 +826,7 @@ stats_tes <- function() {
     # TODO: Add search for NA LTR.
     tes <- tes[!(name %in% LINE_check$qseqid)]
     tes <- tes[!(name %in% LTR_check$qseqid)]
-    tes <- tes[!(name %in% te_data_rep[N>100]$qseqid & orf1 < 600)]
+    tes <- tes[!(name %in% te_data_rep[N>20]$qseqid & orf1 < 1000)] # These should be parameters (was 100 and 600)
     tes <- tes[!(length > (lente / 2))]
   }
   setwd("..")
@@ -894,8 +909,10 @@ invisible(tryCatch({final <- classify_tes()}, error = function(err) {
 invisible(tryCatch({stats_tes()}, error = function(err) {
   end_pantera(paste("Error Stats ->",geterrmessage()))
   }))
+if (opt$debug == FALSE) {
 invisible(tryCatch({cleanup()}, error = function(err) {
   end_pantera(paste("Error Cleanning up ->",geterrmessage()))
   }))
+}
 
 
