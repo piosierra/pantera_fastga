@@ -115,7 +115,7 @@ wfasta <- function(fasta_data, f) {
                           "evalue", "bitscore")
     te_data_mix <- te_data[qseqid != sseqid]
     te_data_rep <- te_data[qseqid == sseqid & 
-                             (qstart != sstart | qend != send)][,.N,qseqid]
+                             (qstart != sstart | qend != send)][,.(N=.N,maxRep=max(length),sumRep=sum(length)),qseqid]
     te_data  <- te_data[!(qseqid == sseqid & qstart == sstart & qend == send)]
     te_data <- te_data[qseqid == sseqid]
     te_data[,len:=abs(qend-qstart)]
@@ -173,6 +173,7 @@ wfasta <- function(fasta_data, f) {
     tes$pas <- unlist(lapply(stri_locate_all_regex(tes$seq,paste0(strrep("A",10),"|",strrep("T",10))),function(x) {min(unlist(x))-1}))
     tes$eas <- nchar(tes$seq)-unlist(lapply(stri_locate_all_regex(tes$seq,paste0(strrep("A",10),"|",strrep("T",10))),function(x) {max(unlist(x))}))
     tes[,pa:=min(pas,eas), by=.I]
+    tes[substr(seq,1,5)=="AAAAA" | substr(seq,1,5)=="TTTTT" | substr(seq,lente-4,lente)=="AAAAA" | substr(seq,lente-4,lente)=="TTTTT" ,pa:=0, by = .I]
     
     tes <- merge(tes,te_data_rep, by.x = "name", by.y = "qseqid", all.x=T)
     
@@ -202,10 +203,10 @@ wfasta <- function(fasta_data, f) {
   tes <- tes[order(-pass,-lente)]
   tes_fa <- tes[, c("name", "seq")]
   stats_data <- tes[,c("name","lente", "pass","type", "pa",
-                       "length","lgap","rgap","orf1","orf2","orf3","N")]
+                       "length","lgap","rgap","orf1","orf2","orf3","N", "maxRep","sumRep")]
   colnames(stats_data) <- c("name","TE_len", "pass",
                             "struct_type", "polyA","struct_len","left_gap",
-                            "right_gap","orf1","orf2","orf3","N")
+                            "right_gap","orf1","orf2","orf3","N", "maxRep","sumRep")
   fwrite(stats_data, paste0(f, ".stats"),  quote =  F, row.names = F, sep ="\t")
 
 
