@@ -693,9 +693,10 @@ cluster_results <- function() {
                 cons_s <- stri_locate_first_fixed(consstring,paste0(rep(1,max(2,(12-floor(sqrt(nrow(ali)-2))))),collapse =""))[1]
                 cons_e <- stri_locate_last_fixed(consstring,paste0(rep(1,max(2,(12-floor(sqrt(nrow(ali)-2))))),collapse =""))[2]
                 edges <- data.table(l=stri_reverse(gsub("-","",substr(alim,1,cons_s-1))), r=gsub("-","",substr(alim,cons_e+1,nchar(alim[1]))))
-                tsds <- unlist(lapply(2:13,function(x){sum(diag(adist(substr(edges$r,1,x),stri_reverse(substr(edges$l,1,x)))))}))
-                tsd_len <- min(which(tsds==min(tsds),tsds))+1
-                tsds_conf <- round(1- tsds[tsd_len-1]/(2*length(tsds)),2)
+              #  tsds <- unlist(lapply(2:13,function(x){sum(diag(adist(substr(edges$r,1,x),stri_reverse(substr(edges$l,1,x)))))}))
+                tsds2 <- unlist(lapply(2:13,function(x){sum(substr(edges$r,1,x) == stri_reverse(substr(edges$l,1,x)))}))
+                tsd_len <- min(which(tsds2==max(tsds2),tsds2))+1
+                tsds_conf <- round(tsds2[tsd_len-1]/nrow(edges),2)
                 tsds_motif <- consensusString(DNAStringSet(c(substr(edges$r,1,tsd_len),stri_reverse(substr(edges$l,1,tsd_len)))), ambiguityMap=IUPAC_CODE_MAP,
                                 threshold=0.25, shift=0L, width=NULL)
                 ### End of exploration
@@ -918,7 +919,7 @@ stats_tes <- function() {
   system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
   te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads ", 
                                opt$threads, 
-                               " -evalue 5000 -outfmt 6 -word_size 5 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
+                               " -evalue 5000 -outfmt 6 -word_size 11 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
   if (nrow(te_data) > 0) {
     colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", 
                           "gapopen","qstart","qend","sstart","send", 
