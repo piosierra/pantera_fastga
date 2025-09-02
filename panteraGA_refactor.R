@@ -158,7 +158,7 @@ read_pars <- function() {
       "max_size",       "l", 1, "integer",   # Max size of polymorphic sequences to investigate [20000]
       "identity",       "i", 1, "double",    # Cutoff (as distance) to cluster in first pass [0.03]
       "identity2",      "y", 1, "double",    # Cutoff (as distance) to cluster in second pass [0.05]
-      "min_cl",         "m", 1, "integer",   # Min number of sequences required to cluster [2]
+      "min_cl",         "m", 1, "integer",   # Min number of sequences required to cluster [3]
       "Ns",             "n", 1, "integer",   # Max % of Ns allowed in a segment [0]
       "pA_bases",       "p", 1, "integer",   # Min number of bases of a polyA [10]
       "cl_size",        "u", 1, "integer",   # Max number of sequences to cluster [200] 
@@ -246,7 +246,7 @@ read_pars <- function() {
   
   if (is.null(opt$flanking)) {
     # min length of mapping flanking sequences to define an SV
-    opt$flanking <- 3000
+    opt$flanking <- 1000
   }
   return(opt)
 }
@@ -309,7 +309,7 @@ parseONEview <- function(f) {
     ovall <- ovall[!(ins_point %in% ovall$ins_point[duplicated(ovall$ins_point)]) ]  
     ovall <- ovall[seq_len >= opt$min_size & seq_len <= opt$max_size]
     lx(paste("Total segments filtered =", nrow(ovall)))
-  ### It seems that removing duplicated insertons is enough to improve the data, the flanking segments distribution improves a lot, for now we do not do anything else with them  
+  ### It seems that removing duplicated insertions is enough to improve the data, the flanking segments distribution improves a lot, for now we do not do anything else with them  
   #  flankcut <-  quantile(c(ovall$flank_r,ovall$flank_l))
   #  ovcut <- ovall[flank_l>flankcut[2] & flank_r>flankcut[2]]
     ### Remove all but one copy when the same segment can map to several places.
@@ -918,7 +918,7 @@ stats_tes <- function() {
   system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
   te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads ", 
                                opt$threads, 
-                               " -evalue 500 -outfmt 6 -word_size 7 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
+                               " -evalue 5000 -outfmt 6 -word_size 5 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
   if (nrow(te_data) > 0) {
     colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", 
                           "gapopen","qstart","qend","sstart","send", 
