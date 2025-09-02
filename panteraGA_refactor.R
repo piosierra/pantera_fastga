@@ -8,8 +8,10 @@
 # Updates to filter 
 # 0.5.2 fix for segment dups
 # 0.6.0 Name changed.
+# 0.6.1 Included new method to find the edges. TSDs returned. Consensus includes
+# now N in positions with no consensus but enough saturation.
 
-pantera_version <- "0.6.0"
+pantera_version <- "0.6.1"
 options(warn = 0)
 
 
@@ -286,7 +288,7 @@ parseONEview <- function(f) {
   if (check == 0 | is.na(check)) {
     end_pantera(".1aln file missing")
   } else {
-  system(paste0("svfind -f ", opt$flanking, " -a ",opt$lib_name,"hapa -b ",opt$lib_name,"hapb ", f, " > /dev/null 2>&1"))
+  system(paste0("svfind -x 12 -f ", opt$flanking, " -a ",opt$lib_name,"hapa -b ",opt$lib_name,"hapb ", f, " > /dev/null 2>&1"))
     ova <- fread(cmd = paste0("ONEview ",opt$lib_name,"hapa"), fill = T)
     ovb <- fread(cmd = paste0("ONEview ",opt$lib_name,"hapb"), fill = T)
     ova[,f:="a"]
@@ -357,6 +359,41 @@ end_pantera <- function(message) {
     "\n"
   ))
   quit(save = "no")
+}
+
+extract_all_substrings <- function(string) {
+  n <- stri_length(string)
+  
+  # Generate all combinations of start positions and lengths
+  combinations <- do.call(rbind, lapply(1:n, function(len) {
+    max_start <- n - len + 1
+    if (max_start >= 1) {
+      data.frame(start = 1:max_start, end = 1:max_start + len - 1)
+    } else {
+      data.frame(start = integer(0), end = integer(0))
+    }
+  }))
+  
+  # Extract all substrings using vectorized stri_sub
+  stri_sub(string, combinations$start, combinations$end)
+}
+
+longest_common_substrings <- function(string1, string2) {
+  subs1 <- extract_all_substrings(string1)
+  subs2 <- extract_all_substrings(string2)
+  
+  # Find common substrings
+  common_subs <- intersect(subs1, subs2)
+  
+  if (length(common_subs) == 0) {
+    return(character(0))
+  }
+  
+  # Find maximum length
+  max_length <- max(stri_length(common_subs))
+  
+  # Return all substrings with maximum length
+  common_subs[stri_length(common_subs) == max_length]
 }
 
 # Converts from dna to binDNA format
@@ -638,23 +675,49 @@ cluster_results <- function() {
                              thread = -1,
                              exec = "mafft"
                 )
-                cons <- toupper(consensusString(DNAStringSet(reformatDNA(ali)), 
+                alim <- reformatDNA(ali)
+                cons <- toupper(consensusString(DNAStringSet(alim), 
                                                 ambiguityMap = "-", 
                                                 threshold = cons_threshold))
+                
+                ### Exploring how to find the TSDs. The cons gives as already the positions. Maybe get pos +-1,checkt that one, and then extend to both sides?
+                
+                cMatrix <- consensusMatrix(DNAStringSet(alim))
+                dtMatrix <- as.data.table(matrix(unlist(cMatrix), nrow = nrow(cMatrix)))
+                saturation <- unlist(lapply(dtMatrix[1:4],sum))/length(seqs)
+                conserv <- unlist(lapply(dtMatrix[1:4],max))/length(seqs)
+               # kclus <- kmeans(conserv,2)
+                consstring <- paste0(as.numeric(conserv>=cons_threshold+.4),collapse = "")
+               # good <- which(kclus$size == max(kclus$size), kclus$size)
+               # consstring <- paste0(kclus$cluster,collapse ="")
+                cons_s <- stri_locate_first_fixed(consstring,paste0(rep(1,max(2,(12-floor(sqrt(nrow(ali)-2))))),collapse =""))[1]
+                cons_e <- stri_locate_last_fixed(consstring,paste0(rep(1,max(2,(12-floor(sqrt(nrow(ali)-2))))),collapse =""))[2]
+                edges <- data.table(l=stri_reverse(gsub("-","",substr(alim,1,cons_s-1))), r=gsub("-","",substr(alim,cons_e+1,nchar(alim[1]))))
+                tsds <- unlist(lapply(2:13,function(x){sum(diag(adist(substr(edges$r,1,x),stri_reverse(substr(edges$l,1,x)))))}))
+                tsd_len <- min(which(tsds==min(tsds),tsds))+1
+                tsds_conf <- round(1- tsds[tsd_len-1]/(2*length(tsds)),2)
+                tsds_motif <- consensusString(DNAStringSet(c(substr(edges$r,1,tsd_len),stri_reverse(substr(edges$l,1,tsd_len)))), ambiguityMap=IUPAC_CODE_MAP,
+                                threshold=0.25, shift=0L, width=NULL)
+                ### End of exploration
+              
+                
               } else {
                 cons <- toupper(paste0(unlist(as.character(seqs)), 
                                        collapse = ""))
               }
-              cons <- gsub("-", "", cons)
+              cons <- gsub("-","N",cons)
+              cons <- substr(cons,cons_s,cons_e)
+              cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
+      
               nam <- paste0(">CONS-", start, "-", end, "-",u, "-", 
-                            nchar(cons), "___",  length(clust_temp))
+                            nchar(cons), "_clus",  length(clust_temp), "_tsdl",tsd_len , "_tsdc",tsds_conf, "_tsdm",tsds_motif,"@@")
               consensi <- rbindlist(list(consensi, data.table(name = nam, 
                                                               seq = cons)))
             }
           } 
         }
                   if (nrow(consensi) > 0) {
-                     wfasta(consensi, paste0("consensi_", start, "_",
+                    wfasta(consensi, paste0("consensi_", start, "_",
                                              end, ".fa"))
                   }
       }
@@ -667,6 +730,7 @@ cluster_results <- function() {
   # zones_interval <- 3000
   zones_interval_overlap <- 0
   cons_threshold <- 0.4
+  saturation_threshold <- 0.6
   opt$cl_size <- 600
     segments_unique <- ffasta("segments_candidates.fa")
     if (nrow(segments_unique) > 0) {
@@ -719,7 +783,13 @@ cluster_results <- function() {
 # Classify TE models
 classify_tes <- function() {
   final <- ffasta("all_consensi.fa")
-  final <- final[!duplicated(final$seq)] ### NEW remove potential duplicates duplicates
+  final <- final[!duplicated(final$seq)]
+  final <- final[order(-nchar(seq))]
+  ### Parse information in final to include later
+  cluster_n <- as.numeric(gsub("_tsdl.*","",gsub(".*_clus","", final$name)))
+  tsd_l <- as.numeric(gsub("_tsdc.*","",gsub(".*_tsdl","", final$name)))
+  tsd_c <- as.numeric(gsub("_tsdm.*","",gsub(".*_tsdc","", final$name)))
+  tsd_m <- gsub("@@","",gsub(".*_tsdm","", final$name))
   final[, name := paste0(">", opt$lib_name, "_", 1:nrow(final), 
                          "-", gsub(".*-","",name))]
   wfasta(final, paste0(opt$lib_name, "-consensi.fa"))
@@ -807,7 +877,11 @@ classify_tes <- function() {
   }
   final[, short_Prediction:=  gsub(".*/","",Prediction)]
   final[,ix:=1:.N, by = short_Prediction]
-  final[,cluster:=as.numeric(gsub(".*___","",name))]
+  final <- final[order(-nchar(seq))]
+  final[,tsd_l:=tsd_l]
+  final[,tsd_c:=tsd_c]
+  final[,tsd_m:=tsd_m]
+  final[,cluster:=cluster_n]
   final[, name := paste0(">",short_Prediction,"_",ix,"-",opt$lib_name, 
                          "#", Prediction), by=1:nrow(final)]
   # if (nrow(final[Probability < 0.9]) > 0) {
@@ -815,14 +889,14 @@ classify_tes <- function() {
   # }
   final <- final[!duplicated(final$seq)]
  # wfasta(final[, c("name", "seq")], paste0(opt$lib_name, "-pantera-final.fa"))
-  return(final[, c("name", "seq", "cluster")])
+  return(final[, c("name", "seq", "cluster", "tsd_l","tsd_c","tsd_m")])
 
 }
 
 # Obtain structural stats from TE models and recover or filter some.
 stats_tes <- function() {
   lx("Stats start")
-  tes <- final[, c("name", "seq", "cluster")]
+  tes <- final[, c("name", "seq", "cluster", "tsd_l","tsd_c","tsd_m")]
   file <- paste0(opt$lib_name, "-consensi.fa")
   temp <- paste0("temp",make.names(gsub(".*/","",file)))
   dir.create(temp)
@@ -925,9 +999,9 @@ stats_tes <- function() {
   tes_dis <- tes[pass==F, c("name", "seq")]
   tes_dis[,name:=paste0(">",name, collapse = ""), .I]
   wfasta(tes_dis, paste0(opt$lib_name, "-pantera-discards.fa"))
-  stats_data <- tes[,c("name", "cluster","pass","lente","type","pa",
+  stats_data <- tes[,c("name", "cluster", "tsd_l","tsd_c","tsd_m","pass","lente","type","pa",
                        "length","lgap","rgap","orf1","orf2","orf3","maxRep")]
-  colnames(stats_data) <- c("name", "cluster_size","pass","TE_len", 
+  colnames(stats_data) <- c("name", "cluster_size", "TSD_length","TSD_confidence","TSD_motif","pass","TE_len", 
                             "struct_type","polyA","struct_len","left_gap",
                             "right_gap","orf1","orf2","orf3","maxTR")
   fwrite(stats_data, paste0(opt$lib_name, "-pantera-final.stats"), 
