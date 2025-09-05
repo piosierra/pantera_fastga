@@ -77,72 +77,77 @@ get_libs <- function() {
 
   if (suppressPackageStartupMessages(!require("this.path", quietly = TRUE))) {
     lx("Intalling package [this.path]")
-    install.packages("this.path")
+    install.packages("this.path") #
   }
   if (suppressPackageStartupMessages(!require("getopt", quietly = TRUE))) {
     lx("Intalling package [getopt]")
-    install.packages("getopt")
+    install.packages("getopt") #
   }
   if (suppressPackageStartupMessages(!require("parallel", quietly = TRUE))) {
     lx("Intalling package [parallel]")
-    install.packages("parallel")
+    install.packages("parallel") #
   }
   if (suppressPackageStartupMessages(!require("ips", quietly = TRUE))) {
     lx("Intalling package [ips]")
-    install.packages("ips")
+    install.packages("ips") #
   }
   if (suppressPackageStartupMessages(!require("BiocManager", quietly = TRUE))) {
     lx("Intalling package [BiocManager]")
-    install.packages("BiocManager")
+    install.packages("BiocManager") #
   }
   if (suppressPackageStartupMessages(!require("Biostrings", quietly = TRUE))) {
     lx("Intalling package [Biostrings]")
-    BiocManager::install("Biostrings")
+    BiocManager::install("Biostrings") #
   }
   if (suppressPackageStartupMessages(!require("DECIPHER", quietly = TRUE))) {
     lx("Intalling package [DECIPHER]")
-    BiocManager::install("DECIPHER")
+    BiocManager::install("DECIPHER") #
   } 
-  if (suppressPackageStartupMessages(!require("bioseq", quietly = TRUE))) {
-    lx("Intalling package [bioseq]")
-    BiocManager::install("bioseq")
+  if (suppressPackageStartupMessages(!require("stringi", quietly = TRUE))) {
+    lx("Intalling package [stringi]")
+    install.packages("stringi") #
   }
   if (suppressPackageStartupMessages(!require("ape", quietly = TRUE))) {
     lx("Intalling package [ape]")
-    install.packages("ape")
+    install.packages("ape") #
   }
   if (suppressPackageStartupMessages(!require("LncFinder", quietly = TRUE))) {
     lx("Intalling package [LncFinder]")
-    install.packages("LncFinder")
-  }
-  if (suppressPackageStartupMessages(!require("seqinr", quietly = TRUE))) {
-    lx("Intalling package [seqinr]")
-    install.packages("seqinr")
-  }
-  if (suppressPackageStartupMessages(!require("purrr", quietly = TRUE))) {
-    lx("Intalling package [purrr]")
-    install.packages("purrr")
-  }
-  if (suppressPackageStartupMessages(!require("dplyr", quietly = TRUE))) {
-    lx("Intalling package [dplyr]")
-    install.packages("dplyr")
-  }
-  if (suppressPackageStartupMessages(!require("data.table", quietly = TRUE))) {
-    lx("Intalling package [data.table]")
-    install.packages("data.table")
+    install.packages("LncFinder") #
   }
   if (suppressPackageStartupMessages(!require("xgboost", quietly = TRUE))) {
     lx("Intalling package [xgboost]")
-    install.packages("xgboost")
+    install.packages("xgboost") #
   }
-  if (!require("stringr", quietly = TRUE)) {
-    lx("Intalling package [stringr]")
-    install.packages("stringr")
+  if (suppressPackageStartupMessages(!require("data.table", quietly = TRUE))) {
+    lx("Intalling package [data.table]")
+    install.packages("data.table") #
   }
-  if (!require("stringi", quietly = TRUE)) {
-    lx("Intalling package [stringi]")
-    install.packages("stringi")
-  }
+  
+  
+  # if (suppressPackageStartupMessages(!require("purrr", quietly = TRUE))) {
+  #   lx("Intalling package [purrr]")
+  #   install.packages("purrr")
+  # }
+  # if (suppressPackageStartupMessages(!require("dplyr", quietly = TRUE))) {
+  #   lx("Intalling package [dplyr]")
+  #   install.packages("dplyr")
+  # }
+  # 
+  # 
+  # if (!require("stringr", quietly = TRUE)) {
+  #   lx("Intalling package [stringr]")
+  #   install.packages("stringr")
+  # }
+  # 
+  # if (suppressPackageStartupMessages(!require("bioseq", quietly = TRUE))) {
+  #   lx("Intalling package [bioseq]")
+  #   BiocManager::install("bioseq")
+  # }
+  # if (suppressPackageStartupMessages(!require("seqinr", quietly = TRUE))) {
+  #   lx("Intalling package [seqinr]")
+  #   install.packages("seqinr")
+  # }
  
 }
 
@@ -265,23 +270,14 @@ ffasta <- function(f) {
   }
 }
 
-# Reads the two ONEcode files extracted from a 1aln file with svfind
-ffastasv <- function(f) {
-  check <- file.size(f)
-  if (check == 0 | is.na(check)) {
-    return(data.table(name = as.character(), seq = as.character()))
-  } else {
-    fa_raw <- fread(cmd=paste("seqconvert -fa",f, " 2> /dev/null"),
-                    header = F,
-                    fill = T,
-                    sep = "\n")
-    fa_raw[, h := grepl(">", V1)]
-    fa_oneline <- fa_raw[, .(paste0(V1, collapse = "")), by = rleid(h)]
-    return(data.table(name = fa_oneline[rep(c(TRUE, FALSE), length = .N)]$V1, 
-                      seq = fa_oneline[rep(c(FALSE, TRUE), length = .N)]$V1))
-  }
+# Writes a fasta file
+wfasta <- function(fasta_data, f) {
+  fileconn <- file(f)
+  writeLines(t(fasta_data), fileconn)
+  close(fileconn)
 }
 
+# Reads the two ONEcode files extracted from a 1aln file with svfind
 parseONEview <- function(f) {
   lx(paste("Procesing file =", f))
   check <- file.size(f)
@@ -336,13 +332,6 @@ parseONEview <- function(f) {
 # Reverse complement of a DNA sequence
 rc <- function(s) {
   stri_reverse(chartr("ACGTacgt","TGCAtgca",s))
-}
-
-# Writes a fasta file
-wfasta <- function(fasta_data, f) {
-  fileconn <- file(f)
-  writeLines(t(fasta_data), fileconn)
-  close(fileconn)
 }
 
 # End and show message
@@ -408,6 +397,7 @@ reformatDNA <- function(dna) {
 }
 
 
+
 ###
 ### Main functions 
 ###
@@ -439,7 +429,7 @@ if (!file.exists(file.path(this.dir(), "model/xgbmodel_typesnames_fix"))) {
 }
 
 lx(paste("pantera path:", this.path()))
-lx(paste("Gfas list:", opt$gfas_list))
+lx(paste("1aln file:", opt$sv_file))
 lx(paste("Output:", opt$output_folder))
 lx(paste("Threads to use:", opt$threads))
 lx(paste("Cores detected:", detectCores()))
@@ -455,52 +445,6 @@ lx(paste("Minimum size of flanking sequences:", opt$flanking))
 return(0)
 }
 
-# Reads polymorfic segments from an alignment
-get_segments <- function(segments_unique) {
-  ## Extract unique segments
-  lx(paste("Procesing file =", opt$sv_file))
-  system(paste0("svfind -f ", opt$flanking, " -a ",opt$lib_name,"hapa -b ",opt$lib_name,"hapb ", opt$sv_file, " > /dev/null 2>&1"))
-  segmentsa <- ffastasv(paste0(opt$lib_name,"hapa"))
-  segmentsb <- ffastasv(paste0(opt$lib_name,"hapb"))
-  unlink(paste0(opt$lib_name,"hapa"))
-  unlink(paste0(opt$lib_name,"hapb"))
-  segments <- rbind(segmentsa,segmentsb)
-  segments[, len := nchar(seq)]
-  segments <- segments[len >= opt$min_size & len <= opt$max_size]
-  segments[,b:=gsub(".*_","",name)]
-  segments <- segments[order(-len)][,.SD[1],b]  #[,.(name,seq)]
-  segments[,a:=gsub("_.*","",name)]
-  segments <- segments[,.SD[1],a]# [,.(name,seq)]
-  segments[,ca:=gsub(">","",gsub(":.*","",a))]
-  segments[,sa:=as.numeric(gsub(".*:","",gsub("-.*","",a)))]
-  segments[,ea:=as.numeric(gsub(".*-","",a))]
-  segments[,cb:=gsub(":.*","",b)]
-  segments[,sb:=as.numeric(gsub(".*:","",gsub("-.*","",b)))]
-  segments[,eb:=as.numeric(gsub(".*-","",b))]
-  segments <-segments[order(ca,sa)]
-  segments[,ov:=shift(ea,-1), by=ca]
-  segments[,ov:=ov-ea]
-  segments[,rn:=.I]
-  dups <-segments[segments$ov<0 | segments[,shift(ov,1), by=ca]$V1<0]
-  ndups <- nrow(dups)
-  dups$g <-  cumsum(c(1L,diff(dups$rn)>1))
-  segments <- segments[!(name %in% dups$name)]
-  dups <- dups[dups[, .I[len == max(len)], by=g]$V1]
-  lx(paste("Removed overlaps =", ndups - nrow(dups)))
-  segments <- rbind(segments,dups[,1:13])
-  segments <- segments[,name:=paste0(">",basename(opt$sv_file),
-                                     "_",gsub(">","",a), collapse = ""), by =.I]
-  lx(paste("Number of valid size segments =", nrow(segments)))
-  if (opt$Ns > 0) {
-    segments[, Ns := nchar(segments$seq) - nchar(gsub("N", "", segments$seq))]
-    segments <- segments[Ns <= (len * opt$Ns)]
-    lx(paste("Number of valid Ns segments =", nrow(segments)))
-    segments$Ns <- NULL
-  }
-  segments_unique <- segments[,.(name,seq)]
-  lx(paste("TOTAL number of segments =", nrow(segments_unique)))
-  return(segments_unique)
-}
 
 # Obtains and stores the polymorphic segments
 read_poly <- function() {
@@ -665,7 +609,7 @@ cluster_results <- function() {
               clust_temp <- strsplit(seqs_clust, "")
               names(clust_temp) <- sg[name %in% 
                                       unlist(clusters[cluster==u]$V1),]$name
-              seqs <- as.DNAbin(clust_temp)
+              seqs <- ape::as.DNAbin(clust_temp)
               if (length(seqs) > 1) {
                 ali <- ips::mafft(seqs,
                              #      method = "globalpair",
@@ -676,13 +620,13 @@ cluster_results <- function() {
                              exec = "mafft"
                 )
                 alim <- reformatDNA(ali)
-                cons <- toupper(consensusString(DNAStringSet(alim), 
+                cons <- toupper(Biostrings::consensusString(Biostrings::DNAStringSet(alim), 
                                                 ambiguityMap = "-", 
                                                 threshold = cons_threshold))
                 
                 ### Exploring how to find the TSDs. The cons gives as already the positions. Maybe get pos +-1,checkt that one, and then extend to both sides?
                 
-                cMatrix <- consensusMatrix(DNAStringSet(alim))
+                cMatrix <- Biostrings::consensusMatrix(Biostrings::DNAStringSet(alim))
                 dtMatrix <- as.data.table(matrix(unlist(cMatrix), nrow = nrow(cMatrix)))
                 saturation <- unlist(lapply(dtMatrix[1:4],sum))/length(seqs)
                 conserv <- unlist(lapply(dtMatrix[1:4],max))/length(seqs)
@@ -697,7 +641,7 @@ cluster_results <- function() {
                 tsds2 <- unlist(lapply(2:13,function(x){sum(substr(edges$r,1,x) == stri_reverse(substr(edges$l,1,x)))}))
                 tsd_len <- min(which(tsds2==max(tsds2),tsds2))+1
                 tsds_conf <- round(tsds2[tsd_len-1]/nrow(edges),2)
-                tsds_motif <- consensusString(DNAStringSet(c(substr(edges$r,1,tsd_len),stri_reverse(substr(edges$l,1,tsd_len)))), ambiguityMap=IUPAC_CODE_MAP,
+                tsds_motif <- Biostrings::consensusString(Biostrings::DNAStringSet(c(substr(edges$r,1,tsd_len),stri_reverse(substr(edges$l,1,tsd_len)))), ambiguityMap=IUPAC_CODE_MAP,
                                 threshold=0.25, shift=0L, width=NULL)
                 ### End of exploration
               
@@ -727,12 +671,13 @@ cluster_results <- function() {
     lx(paste("Zone:", start, "completed."))
     return(discards)
   }
+  
   opt$Ns <- 0
   # zones_interval <- 3000
   zones_interval_overlap <- 0
   cons_threshold <- 0.4
   saturation_threshold <- 0.6
-  opt$cl_size <- 600
+  opt$cl_size <- 1200
     segments_unique <- ffasta("segments_candidates.fa")
     if (nrow(segments_unique) > 0) {
       lx(paste("TOTAL Unique segments:", nrow(segments_unique)))
@@ -747,7 +692,7 @@ cluster_results <- function() {
       dir.create("loop_2", showWarnings = FALSE)
       setwd("loop_2")
       segments_unique[,csum:=cumsum(len)]
-      segments_unique[,g:=csum %/% (opt$cl_size * 1000)]
+      segments_unique[,g:=csum %/% (opt$cl_size * 10000)]
       zones <- segments_unique[,.(min(len),max(len)),g][,2:3]
       zones <- asplit(zones,1)
       # z <- seq(1, nrow(segments_unique), ceiling(nrow(segments_unique) / ceiling(nrow(segments_unique) / opt$cl_size)))
@@ -801,9 +746,9 @@ classify_tes <- function() {
     paste0(
       "getorf -sequence ",
       file,
-      " --outseq temp.orfs -minsize 300 &>/dev/null; blastp -num_threads 8 -query temp.orfs -db ",
+      " --outseq temp.orfs -minsize 300 &>/dev/null; blastp -num_threads ",opt$threads," -query temp.orfs -db ",
       this.dir(),
-      "/libs/RepeatPeps.lib -outfmt 6 -evalue 1e-10 > orfs.tbl"
+      "/libs/RepeatPeps.lib -outfmt 6 -evalue 1e-1 > orfs.tbl"
     )
   )
   lx("Reading data")
@@ -1051,7 +996,7 @@ invisible(tryCatch({init_pantera()}, error = function(err) {
   end_pantera(paste("Initialization error ->",geterrmessage()))
   }))
 invisible(tryCatch({segments_unique <- read_poly()}, error = function(err) {
-  end_pantera(paste("GFA files missing ->",geterrmessage()))
+  end_pantera(paste("1aln file missing ->",geterrmessage()))
   }))
 
 setwd(opt$output_folder)
