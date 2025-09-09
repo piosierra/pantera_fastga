@@ -10,8 +10,9 @@
 # 0.6.0 Name changed.
 # 0.6.1 Included new method to find the edges. TSDs returned. Consensus includes
 # now N in positions with no consensus but enough saturation.
+# 0.7.0 Numerous improvements in filters and Unknown recovery
 
-pantera_version <- "0.6.1"
+pantera_version <- "0.6.2"
 options(warn = 0)
 
 
@@ -119,36 +120,15 @@ get_libs <- function() {
     lx("Intalling package [xgboost]")
     install.packages("xgboost") #
   }
+  if (suppressPackageStartupMessages(!require("quantmod", quietly = TRUE))) {
+    lx("Intalling package [quantmod]")
+    install.packages("quantmod") #
+  }
   if (suppressPackageStartupMessages(!require("data.table", quietly = TRUE))) {
     lx("Intalling package [data.table]")
     install.packages("data.table") #
   }
-  
-  
-  # if (suppressPackageStartupMessages(!require("purrr", quietly = TRUE))) {
-  #   lx("Intalling package [purrr]")
-  #   install.packages("purrr")
-  # }
-  # if (suppressPackageStartupMessages(!require("dplyr", quietly = TRUE))) {
-  #   lx("Intalling package [dplyr]")
-  #   install.packages("dplyr")
-  # }
-  # 
-  # 
-  # if (!require("stringr", quietly = TRUE)) {
-  #   lx("Intalling package [stringr]")
-  #   install.packages("stringr")
-  # }
-  # 
-  # if (suppressPackageStartupMessages(!require("bioseq", quietly = TRUE))) {
-  #   lx("Intalling package [bioseq]")
-  #   BiocManager::install("bioseq")
-  # }
-  # if (suppressPackageStartupMessages(!require("seqinr", quietly = TRUE))) {
-  #   lx("Intalling package [seqinr]")
-  #   install.packages("seqinr")
-  # }
- 
+
 }
 
 # Reads parameters
@@ -167,7 +147,7 @@ read_pars <- function() {
       "Ns",             "n", 1, "integer",   # Max % of Ns allowed in a segment [0]
       "pA_bases",       "p", 1, "integer",   # Min number of bases of a polyA [10]
       "cl_size",        "u", 1, "integer",   # Max number of sequences to cluster [200] 
-      "flanking",       "f", 1, "integer",   # Min length of flanking sequences [4000]
+      "flanking",       "f", 1, "integer",   # Min length of flanking sequences [automatic]
       "verbose",        "v", 0, "logical",   # Show log messages
       "log_file",       "r", 0, "logical",   # Create log file 
       "debug",          "d", 0, "logical",   # Keep intermediate files.
@@ -210,11 +190,11 @@ read_pars <- function() {
   }
   
   if (is.null(opt$min_size)) {
-    opt$min_size <- 100
+    opt$min_size <- 200
   }
   
   if (is.null(opt$max_size)) {
-    opt$max_size <- 30000
+    opt$max_size <- 20000
   }
   
   if (is.null(opt$identity)) {
@@ -235,23 +215,23 @@ read_pars <- function() {
   }
   
   if (is.null(opt$pas)) {
-    # Maximum percentage of Ns in segment.
+    # Length of polyA.
     opt$pas <- 10
   }
   
   if (is.null(opt$pag)) {
-    # Maximum percentage of Ns in segment.
+    # Max gap in polyA.
     opt$pag <- 5
   }
   
   if (is.null(opt$cl_size)) {
-    # Maximum size of cluster to process
+    # Maximum size of initial cluster to process
     opt$cl_size <- 300
   }
   
   if (is.null(opt$flanking)) {
-    # min length of mapping flanking sequences to define an SV
-    opt$flanking <- 1000
+    # Min length of mapping flanking sequences to define an SV. 100 performs automatic adjustment
+    opt$flanking <- 100
   }
   return(opt)
 }
@@ -275,6 +255,103 @@ wfasta <- function(fasta_data, f) {
   fileconn <- file(f)
   writeLines(t(fasta_data), fileconn)
   close(fileconn)
+}
+
+## Code taken from https://github.com/etam4260/kneedle/blob/main/R/kneedle.R
+## Give atribution!
+kneedle <- function(x, y, decreasing, concave, sensitivity = 1) {
+  # Make sure inputs are correct
+  if(length(x) == 0 || length(y) == 0) {
+    stop("Make sure size of both inputs x and y are greater than 0")
+  }
+  if(typeof(x) == "list"|| typeof(y) == "list" || is.data.frame(x) ||
+     is.data.frame(y) || is.array(x) || is.array(y) || is.matrix(x) || is.matrix(y)) {
+    stop("Make sure both inputs x and y are vectors")
+  }
+  if(length(x) != length(y)) {
+    stop("Make sure size of both inputs x and y are equal")
+  }
+  
+  data <- matrix(unlist(list(x, y)), ncol = 2)
+  # This decreasing value has nothing to do with the user inputted value.
+  data <- data[order(data[,1], decreasing = FALSE), ]
+  
+  
+  # If both decreasing and concave are not specified, then this algorithm will
+  # take a guess at those parameters instead of defaulting to certain values.
+  # One method is to take the derivative of the starting point to the ending point
+  # from min x value to max x value. This should be similar to taking the average of all
+  # derivatives from xi to xi+1 where i = 1 to i = length(xvalues)
+  if(missing(decreasing)) {
+    # Increasing discrete data
+    if( (data[(nrow(data)), 2] - data[1, 2]) >= 0 ) {
+      decreasing = FALSE
+      # Decreasing discrete data
+    } else {
+      decreasing = TRUE
+    }
+  }
+  
+  # To determine concavity we need to look at the second derivative of the
+  # entire set of discrete data from xi to xi+1 where i = 1 to i = length(xvalues)
+  # Taking the average of all the second derivatives, if greater or equal to 0
+  # then concave up. If less than 0 then concave down.
+  if(missing(concave)) {
+    secondderiv <- diff(diff(data[, 2]) / diff(data[, 1]))
+    if(mean(secondderiv) > 0) {
+      concave = TRUE
+    } else {
+      concave = FALSE
+    }
+  }
+  
+  maxy <- max(y)
+  miny <- min(y)
+  maxx <- max(x)
+  minx <- min(x)
+  data[ ,1] <- (data[, 1]- min(data[, 1]))/(max(data[ ,1])- min(data[, 1]))
+  data[ ,2] <- (data[, 2]- min(data[, 2]))/(max(data[ ,2])- min(data[, 2]))
+  
+  if(concave && !decreasing) {
+    differ <- abs(c(data[ ,2] - data[ ,1]))
+  } else if(concave && decreasing) {
+    differ <- abs(c(data[ ,2] - (1 - data[ ,1])))
+  } else if(!concave && !decreasing) {
+    differ <- abs(c(data[ ,2] - data[ ,1]))
+  } else if(!concave && decreasing) {
+    differ <- abs(c(data[ ,2] - (1 - data[ ,1])))
+  }
+  
+  
+  peak.indices <- findPeaks(differ) - 1
+  
+  data <- cbind(data, differ)
+  
+  diffx = diff(data[, 1])
+  T.lm.x.s <- sensitivity * mean(diffx)
+  knee = NULL
+  
+  for(i in 1:length(peak.indices)) {
+    T <- data[peak.indices[i] ,3] - (T.lm.x.s)
+    
+    y.value <- data[peak.indices[i] ,3]
+    
+    for(j in (peak.indices[i]):if(i+1 < length(peak.indices)) peak.indices[i+1] else length(differ)) {
+      if(differ[j] < T) {
+        knee = peak.indices[i];
+        break;
+      }
+    }
+    if(!is.null(knee)) {
+      break;
+    }
+  }
+  
+  # Returns the x,y coordinate values
+  x <- ((maxx - minx) * (data[knee, 1])) + minx
+  y <- ((maxy - miny) * (data[knee, 2])) + miny
+  
+  return(c(as.numeric(x),as.numeric(y)))
 }
 
 # Reads the two ONEcode files extracted from a 1aln file with svfind
@@ -306,8 +383,14 @@ parseONEview <- function(f) {
     ovall <- ovall[seq_len >= opt$min_size & seq_len <= opt$max_size]
     lx(paste("Total segments filtered =", nrow(ovall)))
   ### It seems that removing duplicated insertions is enough to improve the data, the flanking segments distribution improves a lot, for now we do not do anything else with them  
-  #  flankcut <-  quantile(c(ovall$flank_r,ovall$flank_l))
-  #  ovcut <- ovall[flank_l>flankcut[2] & flank_r>flankcut[2]]
+  #    flankcut <-  quantile(c(ovall$flank_r,ovall$flank_l))
+    ### WORK HERE, THIS WILL GIVE US THE "ELBOW" POINT TO CHOSE WHICH FLANKS TO KEEP
+    if (opt$flanking == 100) {
+    kneedle_data <- data.table(flanks=c(ovall$flank_r,ovall$flank_l))[,b:=flanks %/% 100][,.N,b][order(b)]
+    opt$flanking <- kneedle(kneedle_data$b,kneedle_data$N)[1]*100
+    }
+    lx(paste("Flanking sequences cutpoint = ", opt$flanking))
+    ovcut <- ovall[flank_l>=opt$flanking & flank_r>=opt$flanking]
     ### Remove all but one copy when the same segment can map to several places.
     ovall <-ovall[order(file,v_name,v_start)]
     ovall[,ov:=shift(v_start,-1), by=v_name]
@@ -397,7 +480,6 @@ reformatDNA <- function(dna) {
 }
 
 
-
 ###
 ### Main functions 
 ###
@@ -470,8 +552,7 @@ find_repeats <- function() {
         segment_u <- segments_unique[len >= start][len <= end]
         segment_u <- segment_u[!duplicated(segment_u)]
         if (nrow(segment_u) >= opt$min_cl)  {
-          lx(paste0("Num. of segments zone ",start," - ",end," : ", 
-                    nrow(segment_u)))
+          lx(paste0("Num. of segments zone ",start," - ",end," : ", nrow(segment_u)))
           segment_sets <- split(segment_u, 
                                 rep(1:(nrow(segment_u) %/% opt$cl_size +1), 
                                 length.out = nrow(segment_u), 
@@ -481,8 +562,7 @@ find_repeats <- function() {
           candidates <- data.table(name = as.character(), 
                                    seq = as.character())
           for (ss in 1:length(segment_sets)) {
-            lx(paste0("Num. of segments zone ", start," - ", 
-                      end," : cluster : ",ss))
+       #     lx(paste0("Num. of segments zone ", start," - ", end," : cluster : ",ss))
             sg <- segment_sets[[ss]]
             sgrc <- data.table(name=sg$name, seq=rc(sg$seq))
             sgrc[,name:=paste0(name,"_RC")]
@@ -498,8 +578,7 @@ find_repeats <- function() {
             list_clust[,name:= sg_seq$name]
             good_clust <- list_clust[,.N,cluster][N>=opt$min_cl]
           
-            lx(paste("# of clusters ", start, "-", end, ":", 
-                     length(unique(good_clust))))
+       #     lx(paste("# of clusters ", start, "-", end, ":", length(unique(good_clust) ))) 
          
             candidates <- rbindlist(list(candidates, 
                   sg[name %in% list_clust[cluster %in% good_clust$cluster]$name, 
@@ -566,11 +645,11 @@ cluster_results <- function() {
     end <- as.numeric(zone[2]) + zones_interval_overlap
     discards <- 0
     if (start != end) {
-      lx(paste("Procesing segments:", start, "-", end))
+ #     lx(paste("Procesing segments:", start, "-", end))
       if (nrow(segments_unique[len >= start][len <= end])> 0) {
         segment_u <- segments_unique[len >= start][len <= end]
         segment_u <- segment_u[!duplicated(segment_u)]
-        lx(paste("Number of sequences:", nrow(segment_u)))
+  #      lx(paste("Number of sequences:", nrow(segment_u)))
           if (nrow(segment_u) >= opt$min_cl)  {
             segment_sets <- split(segment_u, 
                                   rep(1:(nrow(segment_u) %/% opt$cl_size +1), 
@@ -578,8 +657,7 @@ cluster_results <- function() {
                                       each = ceiling(nrow(segment_u) / 
                                                      (nrow(segment_u) %/%
                                                       opt$cl_size +1))))
-            lx(paste("Segment sets", start, "-", end, ":", 
-                     length(segment_sets)))
+    #        lx(paste("Segment sets", start, "-", end, ":", length(segment_sets)))
             for (ss in 1:length(segment_sets)) {
               sg <- segment_sets[[ss]]
               sgrc <- data.table(name=sg$name, seq=rc(sg$seq))
@@ -677,7 +755,7 @@ cluster_results <- function() {
   zones_interval_overlap <- 0
   cons_threshold <- 0.4
   saturation_threshold <- 0.6
-  opt$cl_size <- 1200
+  opt$cl_size <- 1000
     segments_unique <- ffasta("segments_candidates.fa")
     if (nrow(segments_unique) > 0) {
       lx(paste("TOTAL Unique segments:", nrow(segments_unique)))
@@ -692,26 +770,9 @@ cluster_results <- function() {
       dir.create("loop_2", showWarnings = FALSE)
       setwd("loop_2")
       segments_unique[,csum:=cumsum(len)]
-      segments_unique[,g:=csum %/% (opt$cl_size * 10000)]
+      segments_unique[,g:=csum %/% (opt$cl_size * 1000)]
       zones <- segments_unique[,.(min(len),max(len)),g][,2:3]
       zones <- asplit(zones,1)
-      # z <- seq(1, nrow(segments_unique), ceiling(nrow(segments_unique) / ceiling(nrow(segments_unique) / opt$cl_size)))
-      # if (z[length(z)] != nrow(segments_unique)) {
-      #   z <- c(z,nrow(segments_unique))
-      # }
-      # if (length(z) < 3) {
-      #   zones <-
-      #     list(data.frame(
-      #       start = min(segments_unique$len),
-      #       end = max(segments_unique$len)
-      #     ))
-      # } else {
-      #   s = segments_unique[z[-length(z)]]$len +1
-      #   e = segments_unique[z[-1]]$len
-      #   s[1] <- s[1] - 1
-      #   zones <- asplit(data.frame(start = s, end = e), 1)
-      # }
-
       lx(paste("Processing:", length(zones), "windows"))
       loop_exit <- mclapply(
         rev(zones),
@@ -864,15 +925,16 @@ stats_tes <- function() {
   system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
   te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads ", 
                                opt$threads, 
-                               " -evalue 5000 -outfmt 6 -word_size 11 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
+                               " -evalue 500 -outfmt 6 -word_size 11 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
   if (nrow(te_data) > 0) {
     colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", 
                           "gapopen","qstart","qend","sstart","send", 
                           "evalue", "bitscore")
-    te_data_mix <- te_data[qseqid != sseqid]
+    te_data_mix <- te_data[qseqid != sseqid] # Non self matches, to deal with later
     te_data_rep <- te_data[qseqid == sseqid & length >20 & 
-                             (qstart != sstart | qend != send)][,.(N=.N,maxRep=max(length)),qseqid]
-    te_data  <- te_data[!(qseqid == sseqid & qstart == sstart & qend == send)]
+                             (qstart != sstart | qend != send)][,.(N=.N,maxRep=max(length)),qseqid] # large self matches that are not trivial. To filter with MaxRep.
+    te_data  <- te_data[!(qseqid == sseqid & qstart == sstart & qend == send)] # Self matches that are not the whole element, to check for TIR and LTR
+    ### TIR, LTR detection
     te_data <- te_data[qseqid == sseqid]
     te_data[,len:=abs(qend-qstart)]
     te_data <- te_data[order(qstart)][order(-len)]
@@ -888,22 +950,16 @@ stats_tes <- function() {
     te_data[,check_type:=((qend-qstart)*(send-sstart))<0, by=1:nrow(te_data)]
     te_data[,tgap :=lgap+rgap]
     te_data <- te_data[order(tgap)][,.SD[1],qseqid]
-    # te_data_mix <- merge(te_data_mix, 
-    #                      tes[,c("name","lente", "orf1", "orf2", "orf3")]
-    #                      [,name:=gsub(">","",name)], by.x = "qseqid", 
-    #                                                  by.y="name")
-    # te_data_mix <- merge(te_data_mix, 
-    #                      tes[,c("name","lente", "orf1", "orf2", "orf3")]
-    #                      [,name:=gsub(">","",name)], by.x = "sseqid", 
-    #                                                  by.y="name")
-    # te_data_mix[,lqgap:=.(min(qstart,qend)-1), by=.I]
-    # te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
-    # te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
-    # te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
-    # te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
-    # te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
     te_data$type <- "LTR"
     te_data[check_type==T,type:= "TIR"]
+    ### TIR, LTR detection END
+    
+    # Mark as PASS LTR and TIR elements matching their class.
+    good_ltr <- te_data[grepl("LTR",qseqid) & type == "LTR" & lgap < 5 & rgap < 5 & length > 100]$qseqid
+    good_tir <- te_data[grepl("DNA",qseqid) & type == "TIR" & lgap < 5 & rgap < 5]$qseqid
+    
+
+  
 
    tes <- merge(tes[,name:=gsub(">","",name)], 
                 te_data[,c("qseqid","length","lgap","rgap", "type")], 
@@ -924,27 +980,103 @@ stats_tes <- function() {
    tes[,pa:=min(pas,eas), by=.I]
    tes[substr(seq,1,5)=="AAAAA" | substr(seq,1,5)=="TTTTT" | substr(seq,lente-4,lente)=="AAAAA" | substr(seq,lente-4,lente)=="TTTTT" ,pa:=0, by = .I]
    
-   tes[,pass:=F]
+   good_line <- tes[grepl("LINE",name) & orf1 > 1800 & (pa < 5 | is.na(type) | (lgap >10 & rgap > 10)) ]$name
    
-   tes[is.na(pa),pa:=1000]
-   tes[,TR1:=maxRep>length & maxRep>1000]
+   # Find elements which share TIR or LTR to good ones.
+   te_data_mix <- merge(te_data_mix,
+                        tes[,c("name","lente", "orf1", "orf2", "orf3")]
+                        [,name:=gsub(">","",name)], by.x = "qseqid",
+                        by.y="name")
+   te_data_mix <- merge(te_data_mix,
+                        tes[,c("name","lente", "orf1", "orf2", "orf3")]
+                        [,name:=gsub(">","",name)], by.x = "sseqid",
+                        by.y="name")
+   te_data_mix[,lqgap:=.(min(qstart,qend)-1), by=.I]
+   te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
+   te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
+   te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
+   te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
+   te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
+   te_data_mix <- te_data_mix[lqgap<10 | rqgap<10]
+   
+   ## Generate list of LINEs that are subsequence of a better one
+   te_data_mix_line <- te_data_mix[grepl("LINE",qseqid) & grepl("LINE",sseqid)]
+   te_data_mix_line[,large:=qseqid]
+   te_data_mix_line[lente.y>lente.x,large:=sseqid]
+   small_line <- c()
+   for (l in tes[name %in% good_line][order(-lente)]$name) {
+     matches <- unique(c(te_data_mix_line[large==l]$qseqid,te_data_mix_line[large==l]$sseqid))
+     matches <- matches[matches!=l]
+     small_line <- c(small_line,matches)
+     te_data_mix_line <- te_data_mix_line[!(qseqid %in% matches | sseqid %in% matches)]
+   }
+   
+   ### Find TIR elements that can be reclassified
+   te_data_mix_tir <- te_data_mix[(qseqid %in% good_tir | sseqid %in% good_tir) & lsgap < 5 & rsgap < 5 & lqgap < 5 & rqgap <5 ]
+   tir_reco1 <- te_data_mix_tir[grepl("Unknown",qseqid)]
+   tir_reco2 <- te_data_mix_tir[grepl("Unknown",sseqid)]
+   tir_reco <- data.table(name=c(tir_reco1$qseqid,tir_reco2$sseqid), sf=gsub(".*#","",c(tir_reco1$sseqid,tir_reco2$qseqid)))
+   tir_reco <- tir_reco[!duplicated(tir_reco)]
+   lx(paste("Unknown elements reclassified as DNA:", nrow(tir_reco)))
+   tir_reco[,new := paste0(gsub("#.*","",name),"#",sf,collapse=""), by=.I]
+   tir_merge <- merge(tes[,1],tir_reco,all=T)
+   tir_merge[!is.na(new),name:=new]
+   tes$name <- tir_merge$name
+   
+   ### Find LTR elements that can be reclassified
+   te_data_mix_ltr <- te_data_mix[(qseqid %in% good_ltr | sseqid %in% good_ltr) & ((lsgap < 5 & rsgap < 5) | (lqgap < 5 & rqgap <5)) ]
+   ltr_reco1 <- te_data_mix_ltr[grepl("Unknown",qseqid)]
+   ltr_reco2 <- te_data_mix_ltr[grepl("Unknown",sseqid)]
+   ltr_reco <- data.table(name=c(ltr_reco1$qseqid,ltr_reco2$sseqid), sf=gsub(".*#","",c(ltr_reco1$sseqid,ltr_reco2$qseqid)))
+   ltr_reco <- ltr_reco[!duplicated(ltr_reco)]
+   lx(paste("Unknown elements reclassified as LTR:", nrow(ltr_reco)))
+   ltr_reco[,new := paste0(gsub("#.*","",name),"#",sf,collapse=""), by=.I]
+   ltr_merge <- merge(tes[,1],ltr_reco,all=T)
+   ltr_merge[!is.na(new),name:=new]
+   tes$name <- ltr_merge$name
+   
+   ### Find SINE candidates that can be reclassified
+   tes[grepl("#Unknown",name) & lente < 450 & pa < 5, name := paste0(gsub("#.*","",name),"#SINE",collapse=""), by=.I]
+  
+   tes[,pass:=F]
+   tes[,sf:=gsub(".*#","",name)]
+   tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
+   tes[grepl("#DIRS",name) & orf1 > 2000 & lente < 10000, pass:=T]
+   tes[grepl("Crypton",name), pass:=T]
+   tes[grepl("#PLE",name), pass:=T]
+   tes[name %in% good_ltr, pass:=T]
+   tes[name %in% good_tir, pass:=T]
+   tes[grepl("#RC",name) & orf1> 2000, pass:=T]
+   tes[cluster>5 , pass:=T]
+   
+   # This should go at the end of the filters
+   tes[is.na(pa),pa:=NA]
+  # tes[,TR1:=maxRep>length & maxRep>1000]
    tes[,TR2:=maxRep>lente/2.5]
-   tes[is.na(TR1), TR1:=F]
+  # tes[is.na(TR1), TR1:=F]
    tes[is.na(TR2), TR2:=F]
-   tes[TR1!=T & TR2!=T, pass:=T]
+  # tes[TR1!=T & TR2!=T, pass:=T]
+   tes[TR2 == T & type == "LTR" & maxRep > 100, pass == F]
    tes[type == "TIR" & lgap < 3 & rgap< 3, pass:=T]
+   
+   # Reclassification by TSDs
+   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   
+   # SINE reclassification by pA and size
+   tes[grepl("#Unknown",name) & lente < 450 & pa < 5, `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
+   
  
   lx(paste("TRs discards:", nrow(tes[pass==F])))
   }
   setwd("..")
   unlink(temp, recursive = TRUE)
   tes <- tes[order(-lente)]
-  tes_fa <- tes[pass==T, c("name", "seq")]
-  tes_fa[,name:=paste0(">",name, collapse = ""), .I]
-  wfasta(tes_fa, paste0(opt$lib_name, "-pantera-final.fa"))
-  tes_dis <- tes[pass==F, c("name", "seq")]
-  tes_dis[,name:=paste0(">",name, collapse = ""), .I]
-  wfasta(tes_dis, paste0(opt$lib_name, "-pantera-discards.fa"))
+  tes[,name:=paste0(">",name, collapse = ""), .I]
+  wfasta(tes[, c("name", "seq")], paste0(opt$lib_name, "-pantera-final.fa"))
+  wfasta(tes[pass == T, c("name", "seq")], paste0(opt$lib_name, "-pantera-pass.fa"))
+  wfasta(tes[pass == F, c("name", "seq")], paste0(opt$lib_name, "-pantera-discards.fa"))
   stats_data <- tes[,c("name", "cluster", "tsd_l","tsd_c","tsd_m","pass","lente","type","pa",
                        "length","lgap","rgap","orf1","orf2","orf3","maxRep")]
   colnames(stats_data) <- c("name", "cluster_size", "TSD_length","TSD_confidence","TSD_motif","pass","TE_len", 
@@ -954,6 +1086,7 @@ stats_tes <- function() {
          quote =  F, row.names = F, sep ="\t")
 }
 
+# Delete temporary files
 cleanup <- function() {
   
   lx("Library succesfully created.")
