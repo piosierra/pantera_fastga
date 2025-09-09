@@ -1013,8 +1013,10 @@ stats_tes <- function() {
    
    ### Find TIR elements that can be reclassified
    te_data_mix_tir <- te_data_mix[(qseqid %in% good_tir | sseqid %in% good_tir) & lsgap < 5 & rsgap < 5 & lqgap < 5 & rqgap <5 ]
-   tir_reco1 <- te_data_mix_tir[grepl("Unknown",qseqid)]
-   tir_reco2 <- te_data_mix_tir[grepl("Unknown",sseqid)]
+   # tir_reco1 <- te_data_mix_tir[grepl("Unknown",qseqid)]
+   # tir_reco2 <- te_data_mix_tir[grepl("Unknown",sseqid)]
+    tir_reco1 <- te_data_mix_tir[!grepl("DNA",qseqid) & grepl("DNA",sseqid)]
+    tir_reco2 <- te_data_mix_tir[!grepl("DNA",sseqid) & grepl("DNA",qseqid)]
    tir_reco <- data.table(name=c(tir_reco1$qseqid,tir_reco2$sseqid), sf=gsub(".*#","",c(tir_reco1$sseqid,tir_reco2$qseqid)))
    tir_reco <- tir_reco[!duplicated(tir_reco)]
    lx(paste("Unknown elements reclassified as DNA:", nrow(tir_reco)))
