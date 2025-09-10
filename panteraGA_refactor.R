@@ -12,6 +12,10 @@
 # now N in positions with no consensus but enough saturation.
 # 0.7.0 Numerous improvements in filters and Unknown recovery
 
+# TODO 
+# 
+# 
+
 pantera_version <- "0.6.2"
 options(warn = 0)
 
@@ -382,12 +386,9 @@ parseONEview <- function(f) {
     ovall <- ovall[!(ins_point %in% ovall$ins_point[duplicated(ovall$ins_point)]) ]  
     ovall <- ovall[seq_len >= opt$min_size & seq_len <= opt$max_size]
     lx(paste("Total segments filtered =", nrow(ovall)))
-  ### It seems that removing duplicated insertions is enough to improve the data, the flanking segments distribution improves a lot, for now we do not do anything else with them  
-  #    flankcut <-  quantile(c(ovall$flank_r,ovall$flank_l))
-    ### WORK HERE, THIS WILL GIVE US THE "ELBOW" POINT TO CHOSE WHICH FLANKS TO KEEP
     if (opt$flanking == 100) {
     kneedle_data <- data.table(flanks=c(ovall$flank_r,ovall$flank_l))[,b:=flanks %/% 100][,.N,b][order(b)]
-    opt$flanking <- kneedle(kneedle_data$b,kneedle_data$N)[1]*100
+    opt$flanking <- tryCatch({kneedle(kneedle_data$b,kneedle_data$N)[1]*100},error = function(msg){return(2001)})
     }
     lx(paste("Flanking sequences cutpoint = ", opt$flanking))
     ovcut <- ovall[flank_l>=opt$flanking & flank_r>=opt$flanking]
@@ -1070,11 +1071,12 @@ stats_tes <- function() {
    tes[type == "TIR" & lgap < 3 & rgap< 3, pass:=T]
    
    # Reclassification by TSDs
-   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.7 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 2 & tsd_c >0.7 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.3 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & type == "TIR" & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l > 3 & tsd_l < 7 & tsd_c >0.3 & type == "LTR" & length > 150 & lgap < 8 & rgap < 8 & TR2 == F, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
    
    # SINE reclassification by pA and size
    tes[grepl("#Unknown",name) & lente < 450 & pa < 5, `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
