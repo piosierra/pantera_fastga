@@ -1071,8 +1071,10 @@ stats_tes <- function() {
    
    # Reclassification by TSDs
    tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.7 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 2 & tsd_c >0.7 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.7 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
    
    # SINE reclassification by pA and size
    tes[grepl("#Unknown",name) & lente < 450 & pa < 5, `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
