@@ -13,8 +13,11 @@
 # 0.7.0 Numerous improvements in filters and Unknown recovery
 
 # TODO 
+# Create an special type of TSD check for satellites, when the TSD maps to the
+# other edge (as series of tandem repeats)
 # 
-# 
+# Remove also "identical" sequences, not only fragments. 
+#
 
 pantera_version <- "0.6.2"
 options(warn = 0)
@@ -1044,15 +1047,13 @@ stats_tes <- function() {
    ltr_merge[!is.na(new),name:=new]
    tes$name <- ltr_merge$name
    
-   ### Find SINE candidates that can be reclassified
-   tes[grepl("#Unknown",name) & lente < 450 & pa < 5, name := paste0(gsub("#.*","",name),"#SINE",collapse=""), by=.I]
-  
    tes[,pass:=F]
    tes[,sf:=gsub(".*#","",name)]
    tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
    tes[grepl("#DIRS",name) & orf1 > 2000 & lente < 10000, pass:=T]
    tes[grepl("Crypton",name), pass:=T]
    tes[grepl("#PLE",name), pass:=T]
+   tes[grepl("#SINE",name) & lente < 450, pass:=T]
    tes[name %in% good_ltr, pass:=T]
    tes[name %in% ltr_reco$new, pass:=T]
    tes[name %in% good_tir, pass:=T]
@@ -1093,9 +1094,13 @@ stats_tes <- function() {
   wfasta(tes[pass == F, c("name", "seq")], paste0(opt$lib_name, "-pantera-discards.fa"))
   stats_data <- tes[,c("name", "cluster", "tsd_l","tsd_c","tsd_m","pass","lente","type","pa",
                        "length","lgap","rgap","orf1","orf2","orf3","maxRep")]
+  ### Last fixes
+  stats_data[tsd_m == "" | is.na(tsd_m), tsd_c :=0]
+  
   colnames(stats_data) <- c("name", "cluster_size", "TSD_length","TSD_confidence","TSD_motif","pass","TE_len", 
                             "struct_type","polyA","struct_len","left_gap",
                             "right_gap","orf1","orf2","orf3","maxTR")
+
   fwrite(stats_data, paste0(opt$lib_name, "-pantera-final.stats"), 
          quote =  F, row.names = F, sep ="\t")
 }
