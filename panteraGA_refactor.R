@@ -361,9 +361,9 @@ parseONEview <- function(f) {
   if (check == 0 | is.na(check)) {
     end_pantera(".1aln file missing")
   } else {
-  system(paste0("svfind -x 12 -f ", opt$flanking, " -a ",opt$lib_name,"hapa -b ",opt$lib_name,"hapb ", f, " > /dev/null 2>&1"))
-    ova <- fread(cmd = paste0("ONEview ",opt$lib_name,"hapa"), fill = T)
-    ovb <- fread(cmd = paste0("ONEview ",opt$lib_name,"hapb"), fill = T)
+   system(paste0("svfind -x 12 -f ", opt$flanking, " -a ",opt$output_folder,"/",opt$lib_name,"hapa -b ",opt$output_folder,"/",opt$lib_name,"hapb ", f, " > /dev/null 2>&1"))
+    ova <- fread(cmd = paste0("ONEview ",opt$output_folder,"/",opt$lib_name,"hapa"), fill = T)
+    ovb <- fread(cmd = paste0("ONEview ",opt$output_folder,"/",opt$lib_name,"hapb"), fill = T)
     ova[,f:="a"]
     ovb[,f:="b"]
     ov <- rbind(ova,ovb)
@@ -399,8 +399,8 @@ parseONEview <- function(f) {
     ovall[ov < -seq_len ,ov:=1]
     ovall <- ovall[ov>0]
    
-    unlink(paste0(opt$lib_name,"hapa"))
-    unlink(paste0(opt$lib_name,"hapb"))
+    unlink(paste0(opt$output_folder,"/",opt$lib_name,"hapa"))
+    unlink(paste0(opt$output_folder,"/",opt$lib_name,"hapb"))
     
     if (opt$Ns > 0) {
       ovall[, Ns := nchar(ovall$seq) - nchar(gsub("N", "", ovall$seq))]
@@ -888,7 +888,7 @@ classify_tes <- function() {
   final[,cluster:=cluster_n]
   final[, name := paste0(">",short_Prediction,"_",ix,"-",opt$lib_name, 
                          "#", Prediction), by=1:nrow(final)]
-  final[Probability < 0.8, name := paste0(gsub("#.*","",name), "#Unknown", collapse = ""), by=.I]
+  final[Probability < 0.6, name := paste0(gsub("#.*","",name), "#Unknown", collapse = ""), by=.I]
   final <- final[!duplicated(final$seq)]
   fwrite(final, paste0(file, ".statspre"), sep = "\t")
   return(final[, c("name", "seq", "cluster", "tsd_l","tsd_c","tsd_m")])
@@ -1141,7 +1141,7 @@ invisible(tryCatch({init_pantera()}, error = function(err) {
   end_pantera(paste("Initialization error ->",geterrmessage()))
   }))
 invisible(tryCatch({segments_unique <- read_poly()}, error = function(err) {
-  end_pantera(paste("1aln file missing ->",geterrmessage()))
+  end_pantera(paste("Error reading 1aln ->",geterrmessage()))
   }))
 
 setwd(opt$output_folder)
