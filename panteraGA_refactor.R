@@ -866,13 +866,10 @@ classify_tes <- function() {
       Prediction = xgb.pred2$prediction,
       Probability = xgb.pred2$prob
     )
-  fwrite(result, paste0(file, ".predictions"), sep = "\t")
-  
-  
-  result <- fread(paste0(file, ".predictions"))
   result <- result[, name := paste0(">", Name)]
   }
   
+
   lx("Merge")
   tes <- ffasta(file)
   if (exists("result")) {
@@ -891,11 +888,9 @@ classify_tes <- function() {
   final[,cluster:=cluster_n]
   final[, name := paste0(">",short_Prediction,"_",ix,"-",opt$lib_name, 
                          "#", Prediction), by=1:nrow(final)]
-  # if (nrow(final[Probability < 0.9]) > 0) {
-  # final[Probability < 0.9, name := paste0(name, "_LowConf"), by=.I]
-  # }
+  final[Probability < 0.8, name := paste0(gsub("#.*","",name), "#Unknown", collapse = ""), by=.I]
   final <- final[!duplicated(final$seq)]
- # wfasta(final[, c("name", "seq")], paste0(opt$lib_name, "-pantera-final.fa"))
+  fwrite(final, paste0(file, ".statspre"), sep = "\t")
   return(final[, c("name", "seq", "cluster", "tsd_l","tsd_c","tsd_m")])
 
 }
@@ -955,8 +950,8 @@ stats_tes <- function() {
     ### TIR, LTR detection END
     
     # Mark as PASS LTR and TIR elements matching their class.
-    good_ltr <- te_data[grepl("LTR",qseqid) & type == "LTR" & lgap < 5 & rgap < 5 & length > 100]$qseqid
-    good_tir <- te_data[grepl("DNA",qseqid) & type == "TIR" & lgap < 5 & rgap < 5]$qseqid
+    good_ltr <- te_data[grepl("LTR",qseqid) & type == "LTR" & lgap < 8 & rgap < 8 & length > 100]$qseqid
+    good_tir <- te_data[grepl("DNA",qseqid) & type == "TIR" & lgap < 8 & rgap < 8]$qseqid
     
 
   
@@ -980,7 +975,7 @@ stats_tes <- function() {
    tes[,pa:=min(pas,eas), by=.I]
    tes[substr(seq,1,5)=="AAAAA" | substr(seq,1,5)=="TTTTT" | substr(seq,lente-4,lente)=="AAAAA" | substr(seq,lente-4,lente)=="TTTTT" ,pa:=0, by = .I]
    
-   good_line <- tes[grepl("LINE",name) & orf1 > 1800 & (pa < 5 | is.na(type) | (lgap >10 & rgap > 10)) ]$name
+   good_line <- tes[grepl("LINE",name) & orf1 > 1600 & (pa < 10 | is.na(type) | (lgap >10 & rgap > 10)) ]$name
    
    # Find elements which share TIR or LTR to good ones.
    te_data_mix <- merge(te_data_mix,
@@ -995,7 +990,16 @@ stats_tes <- function() {
    te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
    te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
    te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
-   te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
+   ## Remove fully contained in good ones
+   te_data_mix[,cover:=length/min(lente.x,lente.y), by=.I]
+   te_data_mix[,small:= (min(lente.x,lente.y) / max(lente.x,lente.y)) < 0.5,by=.I]
+   smaller <- te_data_mix[cover>0.98 & pident>98 & small == T]
+   smaller_list <- unique(c(smaller[orf1.y>=orf1.x]$qseqid,smaller[orf1.x>orf1.y]$sseqid))
+   tes <- tes[!(name %in% smaller_list)]
+   te_data_mix <- te_data_mix[!(sseqid %in% smaller_list) & !(qseqid %in% smaller_list)]
+   lx(paste("Removed fragments:", length(smaller_list)))
+   
+  # te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
    te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
    te_data_mix <- te_data_mix[lqgap<10 | rqgap<10]
    
@@ -1003,6 +1007,8 @@ stats_tes <- function() {
    te_data_mix_line <- te_data_mix[grepl("LINE",qseqid) & grepl("LINE",sseqid)]
    te_data_mix_line[,large:=qseqid]
    te_data_mix_line[lente.y>lente.x,large:=sseqid]
+  
+   te_data_mix_line <- te_data_mix_line[cover >0.9]
    small_line <- c()
    for (l in tes[name %in% good_line][order(-lente)]$name) {
      matches <- unique(c(te_data_mix_line[large==l]$qseqid,te_data_mix_line[large==l]$sseqid))
@@ -1012,7 +1018,7 @@ stats_tes <- function() {
    }
    
    ### Find TIR elements that can be reclassified
-   te_data_mix_tir <- te_data_mix[(qseqid %in% good_tir | sseqid %in% good_tir) & lsgap < 5 & rsgap < 5 & lqgap < 5 & rqgap <5 ]
+   te_data_mix_tir <- te_data_mix[(qseqid %in% good_tir | sseqid %in% good_tir) & lsgap < 8 & rsgap < 8 & lqgap < 8 & rqgap <8 ]
    # tir_reco1 <- te_data_mix_tir[grepl("Unknown",qseqid)]
    # tir_reco2 <- te_data_mix_tir[grepl("Unknown",sseqid)]
     tir_reco1 <- te_data_mix_tir[!grepl("DNA",qseqid) & grepl("DNA",sseqid)]
@@ -1026,7 +1032,7 @@ stats_tes <- function() {
    tes$name <- tir_merge$name
    
    ### Find LTR elements that can be reclassified
-   te_data_mix_ltr <- te_data_mix[(qseqid %in% good_ltr | sseqid %in% good_ltr) & ((lsgap < 5 & rsgap < 5) | (lqgap < 5 & rqgap <5)) ]
+   te_data_mix_ltr <- te_data_mix[(qseqid %in% good_ltr | sseqid %in% good_ltr) & ((lsgap < 8  & rsgap < 8) | (lqgap < 8 & rqgap <8)) ]
    ltr_reco1 <- te_data_mix_ltr[grepl("Unknown",qseqid)]
    ltr_reco2 <- te_data_mix_ltr[grepl("Unknown",sseqid)]
    ltr_reco <- data.table(name=c(ltr_reco1$qseqid,ltr_reco2$sseqid), sf=gsub(".*#","",c(ltr_reco1$sseqid,ltr_reco2$qseqid)))
@@ -1047,7 +1053,9 @@ stats_tes <- function() {
    tes[grepl("Crypton",name), pass:=T]
    tes[grepl("#PLE",name), pass:=T]
    tes[name %in% good_ltr, pass:=T]
+   tes[name %in% ltr_reco$new, pass:=T]
    tes[name %in% good_tir, pass:=T]
+   tes[name %in% tir_reco$new, pass:=T]
    tes[grepl("#RC",name) & orf1> 2000, pass:=T]
    tes[cluster>5 , pass:=T]
    
@@ -1062,7 +1070,7 @@ stats_tes <- function() {
    tes[type == "TIR" & lgap < 3 & rgap< 3, pass:=T]
    
    # Reclassification by TSDs
-   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
+   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.7 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
    tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
    tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.7, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
    
@@ -1098,7 +1106,7 @@ cleanup <- function() {
   unlink("pantera_lib_0.fa")
   file.rename("segments_candidates.fa", paste0(opt$lib_name, "-segments_candidates.fa"))
   unlink("temp.orfs")
-  unlink("*consensi*")
+ # unlink("*consensi*")
   setwd(current)
   lx(paste0(   "\u001b[32;2m",
                "\u263A",
