@@ -1106,7 +1106,7 @@ cleanup <- function() {
   unlink("pantera_lib_0.fa")
   file.rename("segments_candidates.fa", paste0(opt$lib_name, "-segments_candidates.fa"))
   unlink("temp.orfs")
- # unlink("*consensi*")
+  unlink("*consensi*")
   setwd(current)
   lx(paste0(   "\u001b[32;2m",
                "\u263A",
