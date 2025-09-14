@@ -11,6 +11,7 @@
 # 0.6.1 Included new method to find the edges. TSDs returned. Consensus includes
 # now N in positions with no consensus but enough saturation.
 # 0.7.0 Numerous improvements in filters and Unknown recovery
+# 0.7.1 small fix on last filters
 
 # TODO 
 # Create an special type of TSD check for satellites, when the TSD maps to the
@@ -18,8 +19,21 @@
 # 
 # Remove also "identical" sequences, not only fragments. 
 #
+# Don't make "unknown" all low Probability classified. Depending on the type low
+# prob could be enough (Poseidon) Maybe stablish a cut point depending on the rest.
+#
+# The classifier has to be based also on the domains search. Not just homology. 
+# One way to reduce load would be to run it only on the sequences which lack a 
+# classification (but with large orf?)
+#
+# Poseidon, Neptune, Penelope, might need special filtering
+# Make better TIR finder. Longest subsequence. Similar to rotation algorithm.
 
-pantera_version <- "0.6.2"
+# > lcs <- LCS(strsplit("ACACTGGTCAACAAATTTTCAAAAGTTGTTTGTTTCTG","")[[1]], strsplit("ACACTGGTCAACAGCCAAAATGTTTCGGGCATCAAACC","")[[1]])
+# > paste0(lcs$LCS,collapse = "")
+# This works!
+
+pantera_version <- "0.7.1"
 options(warn = 0)
 
 
@@ -1048,7 +1062,7 @@ stats_tes <- function() {
    tes$name <- ltr_merge$name
    
    tes[,pass:=F]
-   tes[,sf:=gsub(".*#","",name)]
+   tes[,sf:=gsub(".*#","",name), by=.I]
    tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
    tes[grepl("#DIRS",name) & orf1 > 2000 & lente < 10000, pass:=T]
    tes[grepl("Crypton",name), pass:=T]
@@ -1070,17 +1084,19 @@ stats_tes <- function() {
   # tes[TR1!=T & TR2!=T, pass:=T]
    tes[TR2 == T & type == "LTR" & maxRep > 100, pass == F]
    tes[type == "TIR" & lgap < 3 & rgap< 3, pass:=T]
-   
+   lx("check1")
    # Reclassification by TSDs
    tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.3 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
+   lx("check2")
    tes[grepl("#Unknown",name) & type == "TIR" & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   tes[grepl("#Unknown",name) & tsd_l > 3 & tsd_l < 7 & tsd_c >0.3 & type == "LTR" & length > 150 & lgap < 8 & rgap < 8 & TR2 == F, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-   
+   lx("check3")
+ #  tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+ #  tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+ #  tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+  tes[grepl("#Unknown",name) & tsd_l > 3 & tsd_l < 7 & tsd_c >0.3 & type == "LTR" & length > 150 & lgap < 8 & rgap < 8 & TR2 == F, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
+  lx("check4")
    # SINE reclassification by pA and size
-   tes[grepl("#Unknown",name) & lente < 450 & pa < 5, `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
+  tes[grepl("#Unknown",name) & lente < 450 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
    
  
   lx(paste("TRs discards:", nrow(tes[pass==F])))
@@ -1095,7 +1111,7 @@ stats_tes <- function() {
   stats_data <- tes[,c("name", "cluster", "tsd_l","tsd_c","tsd_m","pass","lente","type","pa",
                        "length","lgap","rgap","orf1","orf2","orf3","maxRep")]
   ### Last fixes
-  stats_data[tsd_m == "" | is.na(tsd_m), tsd_c :=0]
+  stats_data[tsd_m == "" | is.na(tsd_m), tsd_c :=0, .I]
   
   colnames(stats_data) <- c("name", "cluster_size", "TSD_length","TSD_confidence","TSD_motif","pass","TE_len", 
                             "struct_type","polyA","struct_len","left_gap",
