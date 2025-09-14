@@ -1057,10 +1057,10 @@ stats_tes <- function() {
    ltr_reco <- ltr_reco[!duplicated(ltr_reco)]
    lx(paste("Unknown elements reclassified as LTR:", nrow(ltr_reco)))
    ltr_reco[,new := paste0(gsub("#.*","",name),"#",sf,collapse=""), by=.I]
-   ltr_merge <- merge(tes[,1],ltr_reco,all=T)
+   ltr_merge <- merge(tes[,1],ltr_reco,all.x=T)
    ltr_merge[!is.na(new),name:=new]
    tes$name <- ltr_merge$name
-   
+   lx("checkA")
    tes[,pass:=F]
    tes[,sf:=gsub(".*#","",name), by=.I]
    tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
@@ -1074,7 +1074,7 @@ stats_tes <- function() {
    tes[name %in% tir_reco$new, pass:=T]
    tes[grepl("#RC",name) & orf1> 2000, pass:=T]
    tes[cluster>5 , pass:=T]
-   
+   lx("check0")
    # This should go at the end of the filters
    tes[is.na(pa),pa:=NA]
   # tes[,TR1:=maxRep>length & maxRep>1000]
