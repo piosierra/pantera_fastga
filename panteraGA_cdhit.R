@@ -12,6 +12,7 @@
 # now N in positions with no consensus but enough saturation.
 # 0.7.0 Numerous improvements in filters and Unknown recovery
 # 0.7.1 small fix on last filters
+# 0.7.2 checking if we can go back to cd-hit
 
 # TODO 
 # Create an special type of TSD check for satellites, when the TSD maps to the
@@ -33,7 +34,7 @@
 # > paste0(lcs$LCS,collapse = "")
 # This works!
 
-pantera_version <- "0.7.1"
+pantera_version <- "0.7.2"
 options(warn = 0)
 
 
@@ -121,10 +122,6 @@ get_libs <- function() {
     lx("Intalling package [Biostrings]")
     BiocManager::install("Biostrings") #
   }
-  if (suppressPackageStartupMessages(!require("DECIPHER", quietly = TRUE))) {
-    lx("Intalling package [DECIPHER]")
-    BiocManager::install("DECIPHER") #
-  } 
   if (suppressPackageStartupMessages(!require("stringi", quietly = TRUE))) {
     lx("Intalling package [stringi]")
     install.packages("stringi") #
@@ -219,11 +216,11 @@ read_pars <- function() {
   }
   
   if (is.null(opt$identity)) {
-    opt$identity <- 0.03
+    opt$identity <- 0.95
   }
   
   if (is.null(opt$identity2)) {
-    opt$identity2 <- 0.05
+    opt$identity2 <- 0.90
   }
   
   if (is.null(opt$min_cl)) {
@@ -558,6 +555,36 @@ read_poly <- function() {
 return(segments_unique)  
 }  
 
+cdhit1 <- function(sequences, threshold) {
+  fname <- gsub(">","",sequences[1]$name)
+  wfasta(sequences[,1:2],fname)
+  system(paste0("cd-hit-est -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
+  hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
+  hitcl[,tic:=substr(V2,1,1)]
+  hitcl[,clus:=rleid(tic)]
+  hitcl <- hitcl[tic==">",c("V2","clus")]
+  colnames(hitcl) <- c("name","clus")
+  unlink(fname)
+  unlink(paste0("cl",fname,".clstr", collapse = ""))
+  unlink(paste0("cl",fname, collapse = ""))
+  hitcl[,name:=gsub("\\.\\.\\.","",name)]
+} 
+
+cdhit2 <- function(sequences, threshold) {
+  fname <- gsub(">","",sequences[1]$name)
+  wfasta(sequences[,1:2],fname)
+  system(paste0("cd-hit-est -G 0 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
+  hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
+  hitcl[,tic:=substr(V2,1,1)]
+  hitcl[,clus:=rleid(tic)]
+  hitcl <- hitcl[tic==">",c("V2","clus")]
+  colnames(hitcl) <- c("name","clus")
+  unlink(fname)
+  unlink(paste0("cl",fname,".clstr", collapse = ""))
+  unlink(paste0("cl",fname, collapse = ""))
+  hitcl[,name:=gsub("\\.\\.\\.","",name)]
+} 
+
 # First pass, finds repeats but does not try to generate any consensus.  
 find_repeats <- function() {
   process_zone <- function(zone) {
@@ -582,25 +609,15 @@ find_repeats <- function() {
           for (ss in 1:length(segment_sets)) {
        #     lx(paste0("Num. of segments zone ", start," - ", end," : cluster : ",ss))
             sg <- segment_sets[[ss]]
-            sgrc <- data.table(name=sg$name, seq=rc(sg$seq))
-            sgrc[,name:=paste0(name,"_RC")]
-            sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
-            set2clus <- DNAStringSet(sg_seq$seq)
-            list_clust <- data.table(Clusterize(set2clus, 
-                                                cutoff = opt$identity, 
-                                                verbose = F, 
-                                                penalizeGapLetterMatches = T, 
-                                                includeTerminalGaps = T,
-                                                processors = 1, 
-                                                minCoverage = 0.9))
-            list_clust[,name:= sg_seq$name]
-            good_clust <- list_clust[,.N,cluster][N>=opt$min_cl]
-          
-       #     lx(paste("# of clusters ", start, "-", end, ":", length(unique(good_clust) ))) 
-         
+            if (nrow(sg)>1) {
+            sg_clus <- cdhit1(sg, opt$identity)
+            sg_clus[,n:=.N,clus]
+            sg_clus <- sg_clus[n>=opt$min_cl]
+    
             candidates <- rbindlist(list(candidates, 
-                  sg[name %in% list_clust[cluster %in% good_clust$cluster]$name, 
+                  sg[name %in% sg_clus$name, 
                      c("name", "seq")]))
+            }
           }
           if (nrow(candidates) > 0) {
             wfasta(candidates, paste0("candidates_", start, "_", end, ".fa"))
@@ -678,33 +695,38 @@ cluster_results <- function() {
     #        lx(paste("Segment sets", start, "-", end, ":", length(segment_sets)))
             for (ss in 1:length(segment_sets)) {
               sg <- segment_sets[[ss]]
-              sgrc <- data.table(name=sg$name, seq=rc(sg$seq))
-              sgrc[,name:=paste0(name,"_RC")]
-              sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
-              set2clus <- DNAStringSet(sg_seq$seq)
-              list_clust <- data.table(Clusterize(set2clus, 
-                                                  cutoff = opt$identity2, 
-                                                  verbose = F, 
-                                                  penalizeGapLetterMatches = T, 
-                                                  includeTerminalGaps = T,
-                                                  processors = 1, 
-                                                  minCoverage = -0.9))
-              lx(paste("Segment sets", start, "-", end, ": clusters", 
-                       length(unique(list_clust$cluster))))
-              list_clust[,name:= sg_seq$name]
-              list_clust[,name:=gsub("_RC","",name)]
-              clusters <- list_clust[order(name)][,.(list(name)), cluster]
-              clusters <- clusters[!duplicated(clusters$V1)]
-              clusters[,n:=length(V1[[1]]), by=.I]
-              clusters <- clusters[clusters$n>=opt$min_cl,] 
+              if (nrow(sg)>1) {
+              sg_clus <- cdhit2(sg, opt$identity2)
+              sg_clus[,n:=.N,clus]
+              sg_clus <- sg_clus[n>=opt$min_cl]
+              
+              # sg <- segment_sets[[ss]]
+              # sgrc <- data.table(name=sg$name, seq=rc(sg$seq))
+              # sgrc[,name:=paste0(name,"_RC")]
+              # sg_seq <- rbindlist(list(sg[,c("name","seq")],sgrc))
+              # set2clus <- DNAStringSet(sg_seq$seq)
+              # list_clust <- data.table(Clusterize(set2clus, 
+              #                                     cutoff = opt$identity2, 
+              #                                     verbose = F, 
+              #                                     penalizeGapLetterMatches = T, 
+              #                                     includeTerminalGaps = T,
+              #                                     processors = 1, 
+              #                                     minCoverage = -0.9))
+              # lx(paste("Segment sets", start, "-", end, ": clusters", 
+              #          length(unique(list_clust$cluster))))
+              # list_clust[,name:= sg_seq$name]
+              # list_clust[,name:=gsub("_RC","",name)]
+              # clusters <- list_clust[order(name)][,.(list(name)), cluster]
+              # clusters <- clusters[!duplicated(clusters$V1)]
+              # clusters[,n:=length(V1[[1]]), by=.I]
+              # clusters <- clusters[clusters$n>=opt$min_cl,] 
               consensi <- data.table(name = as.character(), 
                                      seq = as.character())
-          if ( nrow(clusters) > 0) {
-            for (u in unique(clusters$cluster)) {
-              seqs_clust <- sg[name %in% unlist(clusters[cluster==u]$V1),]$seq
-              clust_temp <- strsplit(seqs_clust, "")
-              names(clust_temp) <- sg[name %in% 
-                                      unlist(clusters[cluster==u]$V1),]$name
+          if ( nrow(sg_clus) > 0) {
+            for (u in unique(sg_clus$clus)) {
+              seqs_clust <- sg[name %in% unlist(sg_clus[clus==u]$name)]
+              clust_temp <- strsplit(seqs_clust$seq, "")
+              names(clust_temp) <- seqs_clust$name
               seqs <- ape::as.DNAbin(clust_temp)
               if (length(seqs) > 1) {
                 ali <- ips::mafft(seqs,
@@ -761,7 +783,8 @@ cluster_results <- function() {
                     wfasta(consensi, paste0("consensi_", start, "_",
                                              end, ".fa"))
                   }
-      }
+            }
+              }
       }
     }
     lx(paste("Zone:", start, "completed."))
