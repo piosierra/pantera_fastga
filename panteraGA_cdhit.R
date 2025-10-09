@@ -735,6 +735,9 @@ cluster_results <- function() {
           if ( nrow(sg_clus) > 0) {
             for (u in unique(sg_clus$clus)) {
               seqs_clust <- sg[name %in% unlist(sg_clus[clus==u]$name)]
+              lx(u)
+              lx(min(seqs_clust$len))
+              lx(max(seqs_clust$len))
               clust_temp <- strsplit(seqs_clust$seq, "")
               names(clust_temp) <- seqs_clust$name
               seqs <- ape::as.DNAbin(clust_temp)
@@ -751,7 +754,7 @@ cluster_results <- function() {
                 cons <- toupper(Biostrings::consensusString(Biostrings::DNAStringSet(alim), 
                                                 ambiguityMap = "-", 
                                                 threshold = cons_threshold))
-                
+               
                 ### Exploring how to find the TSDs. The cons gives as already the positions. Maybe get pos +-1,checkt that one, and then extend to both sides?
                 
                 cMatrix <- Biostrings::consensusMatrix(Biostrings::DNAStringSet(alim))
@@ -781,7 +784,7 @@ cluster_results <- function() {
               cons <- gsub("-","N",cons)
               cons <- substr(cons,cons_s,cons_e)
               cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
-      
+              lx(nchar(cons))
               nam <- paste0(">CONS-", start, "-", end, "-",u, "-", 
                             nchar(cons), "_clus",  length(clust_temp), "_tsdl",tsd_len , "_tsdc",tsds_conf, "_tsdm",tsds_motif,"@@")
               consensi <- rbindlist(list(consensi, data.table(name = nam, 
