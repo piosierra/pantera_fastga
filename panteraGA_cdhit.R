@@ -1131,9 +1131,14 @@ stats_tes <- function() {
   tes[grepl("#Unknown",name) & lente < 500 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
    # Recover CACTA with short tirs
   tes[,st:=short_tir(substr(seq,1,10), rc(substr(seq,nchar(seq)-9,nchar(seq)))), .I]
-  tes[grepl("#DNA", name) & st==T, pass:=T]
-  tes[grepl("#DNA", name) & st==T, type:="TIR"]
-  tes[grepl("#DNA", name) & st==T, length:=7]
+ 
+  tes[grepl("#DNA", name) & st==T & type == "TIR" & pass == F, length:=7]
+  tes[grepl("#DNA", name) & st==T & type == "TIR" & pass == F, pass:=T]
+  tes[grepl("#DNA", name) & st==T & type != "TIR", pass:=T]
+  tes[grepl("#DNA", name) & st==T & type != "TIR", length:=7]
+  tes[grepl("#DNA", name) & st==T & type != "TIR", type=="TIR"]
+
+
   lx(paste("TRs discards:", nrow(tes[pass==F])))
   }
   setwd("..")
