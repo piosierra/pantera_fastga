@@ -110,6 +110,10 @@ get_libs <- function() {
     lx("Intalling package [parallel]")
     install.packages("parallel") #
   }
+  if (suppressPackageStartupMessages(!require("qualV", quietly = TRUE))) {
+    lx("Intalling package [qualV]")
+    install.packages("qualV") #
+  }
   if (suppressPackageStartupMessages(!require("ips", quietly = TRUE))) {
     lx("Intalling package [ips]")
     install.packages("ips") #
@@ -447,6 +451,12 @@ end_pantera <- function(message) {
   ))
   quit(save = "no")
 }
+
+short_tir <- function(a,b) {
+  lcs <- LCS(strsplit(a,"")[[1]], strsplit(b,"")[[1]])
+  return(nchar(paste0(lcs$LCS,collapse = ""))>7)
+}
+
 
 extract_all_substrings <- function(string) {
   n <- stri_length(string)
@@ -929,7 +939,7 @@ classify_tes <- function() {
   final[,cluster:=cluster_n]
   final[, name := paste0(">",short_Prediction,"_",ix,"-",opt$lib_name, 
                          "#", Prediction), by=1:nrow(final)]
-  final[Probability < 0.6, name := paste0(gsub("#.*","",name), "#Unknown", collapse = ""), by=.I]
+  final[Probability < 0.4, name := paste0(gsub("#.*","",name), "#Unknown", collapse = ""), by=.I]
   final <- final[!duplicated(final$seq)]
   fwrite(final, paste0(file, ".statspre"), sep = "\t")
   return(final[, c("name", "seq", "cluster", "tsd_l","tsd_c","tsd_m")])
@@ -1119,8 +1129,11 @@ stats_tes <- function() {
   lx("check4")
    # SINE reclassification by pA and size
   tes[grepl("#Unknown",name) & lente < 500 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
-   
- 
+   # Recover CACTA with short tirs
+  tes[,st:=short_tir(substr(seq,1,10), rc(substr(seq,nchar(seq)-9,nchar(seq)))), .I]
+  tes[grepl("#DNA", name) & st==T, pass:=T]
+  tes[grepl("#DNA", name) & st==T, type:="TIR"]
+  tes[grepl("#DNA", name) & st==T, length:=7]
   lx(paste("TRs discards:", nrow(tes[pass==F])))
   }
   setwd("..")
