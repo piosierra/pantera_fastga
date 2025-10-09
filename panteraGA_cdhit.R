@@ -566,7 +566,7 @@ return(segments_unique)
 }  
 
 cdhit1 <- function(sequences, threshold) {
-  fname <- gsub(">","",sequences[1]$name)
+  fname <- paste0(stri_rand_strings(1, 12, '[A-Z]'),gsub(">","",sequences[1]$name), collapse="")
   wfasta(sequences[,1:2],fname)
   system(paste0("cd-hit-est -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
   hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
@@ -581,7 +581,7 @@ cdhit1 <- function(sequences, threshold) {
 } 
 
 cdhit2 <- function(sequences, threshold) {
-  fname <- gsub(">","",sequences[1]$name)
+  fname <- paste0(stri_rand_strings(1, 12, '[A-Z]'),gsub(">","",sequences[1]$name), collapse="")
   wfasta(sequences[,1:2],fname)
   system(paste0("cd-hit-est -G 0 -T 4 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
   hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
@@ -735,9 +735,6 @@ cluster_results <- function() {
           if ( nrow(sg_clus) > 0) {
             for (u in unique(sg_clus$clus)) {
               seqs_clust <- sg[name %in% unlist(sg_clus[clus==u]$name)]
-              lx(u)
-              lx(min(seqs_clust$len))
-              lx(max(seqs_clust$len))
               clust_temp <- strsplit(seqs_clust$seq, "")
               names(clust_temp) <- seqs_clust$name
               seqs <- ape::as.DNAbin(clust_temp)
@@ -784,6 +781,9 @@ cluster_results <- function() {
               cons <- gsub("-","N",cons)
               cons <- substr(cons,cons_s,cons_e)
               cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
+              lx(paste("cluster",u))
+              lx(min(seqs_clust$len))
+              lx(max(seqs_clust$len))
               lx(nchar(cons))
               nam <- paste0(">CONS-", start, "-", end, "-",u, "-", 
                             nchar(cons), "_clus",  length(clust_temp), "_tsdl",tsd_len , "_tsdc",tsds_conf, "_tsdm",tsds_motif,"@@")
