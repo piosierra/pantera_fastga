@@ -208,11 +208,11 @@ read_pars <- function() {
   }
   
   if (is.null(opt$min_size)) {
-    opt$min_size <- 200
+    opt$min_size <- 100
   }
   
   if (is.null(opt$max_size)) {
-    opt$max_size <- 20000
+    opt$max_size <- 30000
   }
   
   if (is.null(opt$identity)) {
@@ -680,11 +680,11 @@ cluster_results <- function() {
     end <- as.numeric(zone[2]) + zones_interval_overlap
     discards <- 0
     if (start != end) {
- #     lx(paste("Procesing segments:", start, "-", end))
+      lx(paste("Procesing segments:", start, "-", end))
       if (nrow(segments_unique[len >= start][len <= end])> 0) {
         segment_u <- segments_unique[len >= start][len <= end]
         segment_u <- segment_u[!duplicated(segment_u)]
-  #      lx(paste("Number of sequences:", nrow(segment_u)))
+        lx(paste("Number of sequences:", nrow(segment_u)))
           if (nrow(segment_u) >= opt$min_cl)  {
             segment_sets <- split(segment_u, 
                                   rep(1:(nrow(segment_u) %/% opt$cl_size +1), 
@@ -811,7 +811,7 @@ cluster_results <- function() {
       dir.create("loop_2", showWarnings = FALSE)
       setwd("loop_2")
       segments_unique[,csum:=cumsum(len)]
-      segments_unique[,g:=csum %/% (opt$cl_size * 1000)]
+      segments_unique[,g:=csum %/% (opt$cl_size * 3000)]
       zones <- segments_unique[,.(min(len),max(len)),g][,2:3]
       zones <- asplit(zones,1)
       lx(paste("Processing:", length(zones), "windows"))
@@ -955,7 +955,7 @@ stats_tes <- function() {
                     orf2 = orfs_list_ordered[2],
                     orf3 = orfs_list_ordered[3]))
   }
-  orfs_tes <- rbindlist(mclapply(tes$seq,three_orfs))
+  orfs_tes <- rbindlist(mclapply(tes$seq,three_orfs, mc.cores = opt$threads))
   tes <- cbind(tes,orfs_tes)
   wfasta(tes[, c("name","seq")], paste0("tmp-tes"))
   system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
@@ -991,8 +991,8 @@ stats_tes <- function() {
     ### TIR, LTR detection END
     
     # Mark as PASS LTR and TIR elements matching their class.
-    good_ltr <- te_data[grepl("LTR",qseqid) & type == "LTR" & lgap < 8 & rgap < 8 & length > 100]$qseqid
-    good_tir <- te_data[grepl("DNA",qseqid) & type == "TIR" & lgap < 8 & rgap < 8]$qseqid
+    good_ltr <- te_data[grepl("#LTR",qseqid) & type == "LTR" & lgap < 8 & rgap < 8 & length > 100]$qseqid
+    good_tir <- te_data[grepl("#DNA",qseqid) & type == "TIR" & lgap < 8 & rgap < 8]$qseqid
     
 
   
@@ -1033,23 +1033,24 @@ stats_tes <- function() {
    te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
    ## Remove fully contained in good ones
    te_data_mix[,cover:=length/min(lente.x,lente.y), by=.I]
-   te_data_mix[,small:= (min(lente.x,lente.y) / max(lente.x,lente.y)) < 0.5,by=.I]
-   smaller <- te_data_mix[cover>0.98 & pident>98 & small == T]
-   smaller_list <- unique(c(smaller[orf1.y>=orf1.x]$qseqid,smaller[orf1.x>orf1.y]$sseqid))
-   tes <- tes[!(name %in% smaller_list)]
-   te_data_mix <- te_data_mix[!(sseqid %in% smaller_list) & !(qseqid %in% smaller_list)]
-   lx(paste("Removed fragments:", length(smaller_list)))
+ #  te_data_mix[,small:= (min(lente.x,lente.y) / max(lente.x,lente.y)) < 0.5,by=.I]
+ #  smaller <- te_data_mix[cover>0.98 & pident>98 & small == T]
+ #  smaller <- te_data_mix[cover>0.98 & pident>98
+ #   smaller_list <- unique(c(smaller[orf1.y>=orf1.x]$qseqid,smaller[orf1.x>orf1.y]$sseqid))
+ #   tes <- tes[!(name %in% smaller_list)]
+ #   te_data_mix <- te_data_mix[!(sseqid %in% smaller_list) & !(qseqid %in% smaller_list)]
+ #   lx(paste("Removed fragments:", length(smaller_list)))
    
   # te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
-   te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
-   te_data_mix <- te_data_mix[lqgap<10 | rqgap<10]
-   
+  # te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
+  # te_data_mix <- te_data_mix[lqgap<10 | rqgap<10]
+   te_data_mix <- te_data_mix[]
    ## Generate list of LINEs that are subsequence of a better one
-   te_data_mix_line <- te_data_mix[grepl("LINE",qseqid) & grepl("LINE",sseqid)]
+   te_data_mix_line <- te_data_mix[(grepl("LINE",qseqid) | grepl("LINE",sseqid)) & pident> 90 & cover > 0.98]
    te_data_mix_line[,large:=qseqid]
    te_data_mix_line[lente.y>lente.x,large:=sseqid]
   
-   te_data_mix_line <- te_data_mix_line[cover >0.9]
+  # te_data_mix_line <- te_data_mix_line[cover >0.9]
    small_line <- c()
    for (l in tes[name %in% good_line][order(-lente)]$name) {
      matches <- unique(c(te_data_mix_line[large==l]$qseqid,te_data_mix_line[large==l]$sseqid))
@@ -1083,21 +1084,22 @@ stats_tes <- function() {
    ltr_merge <- merge(tes[,1],ltr_reco,all.x=T)
    ltr_merge[!is.na(new),name:=new]
    tes$name <- ltr_merge$name
-   lx("checkA")
+   
+  ### Putting all together
    tes[,pass:=F]
    tes[,sf:=gsub(".*#","",name), by=.I]
    tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
    tes[grepl("#DIRS",name) & orf1 > 2000 & lente < 10000, pass:=T]
    tes[grepl("Crypton",name), pass:=T]
    tes[grepl("#PLE",name), pass:=T]
-   tes[grepl("#SINE",name) & lente < 450, pass:=T]
+   tes[grepl("#SINE",name) & lente < 500, pass:=T]
    tes[name %in% good_ltr, pass:=T]
    tes[name %in% ltr_reco$new, pass:=T]
    tes[name %in% good_tir, pass:=T]
    tes[name %in% tir_reco$new, pass:=T]
    tes[grepl("#RC",name) & orf1> 2000, pass:=T]
    tes[cluster>5 , pass:=T]
-   lx("check0")
+   tes[name %in% small_line, pass:=F]
    # This should go at the end of the filters
    tes[is.na(pa),pa:=NA]
   # tes[,TR1:=maxRep>length & maxRep>1000]
@@ -1107,19 +1109,16 @@ stats_tes <- function() {
   # tes[TR1!=T & TR2!=T, pass:=T]
    tes[TR2 == T & type == "LTR" & maxRep > 100, pass == F]
    tes[type == "TIR" & lgap < 3 & rgap< 3, pass:=T]
-   lx("check1")
    # Reclassification by TSDs
-   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.3 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA/hAT",collapse=""),pass=T), by=.I]
-   lx("check2")
+   tes[grepl("#Unknown",name) & type == "TIR" & tsd_l == 8 & tsd_c >0.3 & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
    tes[grepl("#Unknown",name) & type == "TIR" & lgap < 8 & rgap < 8,  `:=`(name=paste0(gsub("#.*","",name),"#DNA",collapse=""),pass=T), by=.I]
-   lx("check3")
  #  tes[grepl("#Unknown",name) & tsd_l == 4 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
  #  tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
  #  tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
   tes[grepl("#Unknown",name) & tsd_l > 3 & tsd_l < 7 & tsd_c >0.3 & type == "LTR" & length > 150 & lgap < 8 & rgap < 8 & TR2 == F, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
   lx("check4")
    # SINE reclassification by pA and size
-  tes[grepl("#Unknown",name) & lente < 450 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
+  tes[grepl("#Unknown",name) & lente < 500 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
    
  
   lx(paste("TRs discards:", nrow(tes[pass==F])))
