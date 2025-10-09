@@ -583,7 +583,7 @@ cdhit1 <- function(sequences, threshold) {
 cdhit2 <- function(sequences, threshold) {
   fname <- paste0(stri_rand_strings(1, 12, '[A-Z]'),gsub(">","",sequences[1]$name), collapse="")
   wfasta(sequences[,1:2],fname)
-  system(paste0("cd-hit-est -G 0 -T 4 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
+  system(paste0("cd-hit-est -G 0 -g 0 -T 1 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
   hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
   hitcl[,tic:=substr(V2,1,1)]
   hitcl[,clus:=rleid(tic)]
@@ -706,7 +706,7 @@ cluster_results <- function() {
             for (ss in 1:length(segment_sets)) {
               sg <- segment_sets[[ss]]
               if (nrow(sg)>1) {
-              sg_clus <- cdhit2(sg, opt$identity2)
+              sg_clus <- cdhit1(sg, opt$identity2)
               sg_clus[,n:=.N,clus]
               sg_clus <- sg_clus[n>=opt$min_cl]
               
@@ -782,6 +782,7 @@ cluster_results <- function() {
               cons <- substr(cons,cons_s,cons_e)
               cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
               lx(paste("cluster",u))
+              lx(nrow(sg))
               lx(min(seqs_clust$len))
               lx(max(seqs_clust$len))
               lx(nchar(cons))
@@ -1140,7 +1141,7 @@ stats_tes <- function() {
   tes[grepl("#DNA", name) & st==T & type == "TIR" & pass == F, pass:=T]
   tes[grepl("#DNA", name) & st==T & type != "TIR", pass:=T]
   tes[grepl("#DNA", name) & st==T & type != "TIR", length:=7]
-  tes[grepl("#DNA", name) & st==T & type != "TIR", type=="TIR"]
+  tes[grepl("#DNA", name) & st==T & type != "TIR", type:="TIR"]
 
 
   lx(paste("TRs discards:", nrow(tes[pass==F])))
