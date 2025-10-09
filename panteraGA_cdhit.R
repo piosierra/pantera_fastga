@@ -12,7 +12,7 @@
 # now N in positions with no consensus but enough saturation.
 # 0.7.0 Numerous improvements in filters and Unknown recovery
 # 0.7.1 small fix on last filters
-# 0.7.2 checking if we can go back to cd-hit
+# 0.7.2 Back to cd-hit. Small LINEs removal improved. Short TIRs detection.
 
 # TODO 
 # Create an special type of TSD check for satellites, when the TSD maps to the
@@ -583,7 +583,7 @@ cdhit1 <- function(sequences, threshold) {
 cdhit2 <- function(sequences, threshold) {
   fname <- gsub(">","",sequences[1]$name)
   wfasta(sequences[,1:2],fname)
-  system(paste0("cd-hit-est -G 0 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
+  system(paste0("cd-hit-est -G 0 -T 4 -aL 0.8 -aS 0.9 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
   hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
   hitcl[,tic:=substr(V2,1,1)]
   hitcl[,clus:=rleid(tic)]
@@ -1073,20 +1073,22 @@ stats_tes <- function() {
    te_data_mix_tir <- te_data_mix[(qseqid %in% good_tir | sseqid %in% good_tir) & lsgap < 8 & rsgap < 8 & lqgap < 8 & rqgap <8 ]
    # tir_reco1 <- te_data_mix_tir[grepl("Unknown",qseqid)]
    # tir_reco2 <- te_data_mix_tir[grepl("Unknown",sseqid)]
-    tir_reco1 <- te_data_mix_tir[!grepl("DNA",qseqid) & grepl("DNA",sseqid)]
-    tir_reco2 <- te_data_mix_tir[!grepl("DNA",sseqid) & grepl("DNA",qseqid)]
+   tir_reco1 <- te_data_mix_tir[!grepl("DNA",qseqid) & grepl("DNA",sseqid)]
+   tir_reco2 <- te_data_mix_tir[!grepl("DNA",sseqid) & grepl("DNA",qseqid)]
    tir_reco <- data.table(name=c(tir_reco1$qseqid,tir_reco2$sseqid), sf=gsub(".*#","",c(tir_reco1$sseqid,tir_reco2$qseqid)))
    tir_reco <- tir_reco[!duplicated(tir_reco)]
    lx(paste("Unknown elements reclassified as DNA:", nrow(tir_reco)))
    tir_reco[,new := paste0(gsub("#.*","",name),"#",sf,collapse=""), by=.I]
-   tir_merge <- merge(tes[,1],tir_reco,all=T)
+   tir_merge <- merge(tes[,1],tir_reco,all.x=T)
    tir_merge[!is.na(new),name:=new]
    tes$name <- tir_merge$name
    
    ### Find LTR elements that can be reclassified
    te_data_mix_ltr <- te_data_mix[(qseqid %in% good_ltr | sseqid %in% good_ltr) & ((lsgap < 8  & rsgap < 8) | (lqgap < 8 & rqgap <8)) ]
-   ltr_reco1 <- te_data_mix_ltr[grepl("Unknown",qseqid)]
-   ltr_reco2 <- te_data_mix_ltr[grepl("Unknown",sseqid)]
+   # ltr_reco1 <- te_data_mix_ltr[grepl("Unknown",qseqid)]
+   # ltr_reco2 <- te_data_mix_ltr[grepl("Unknown",sseqid)]
+   ltr_reco1 <- te_data_mix_tir[!grepl("LTR",qseqid) & grepl("LTR",sseqid)]
+   ltr_reco2 <- te_data_mix_tir[!grepl("LTR",sseqid) & grepl("LTR",qseqid)]
    ltr_reco <- data.table(name=c(ltr_reco1$qseqid,ltr_reco2$sseqid), sf=gsub(".*#","",c(ltr_reco1$sseqid,ltr_reco2$qseqid)))
    ltr_reco <- ltr_reco[!duplicated(ltr_reco)]
    lx(paste("Unknown elements reclassified as LTR:", nrow(ltr_reco)))
@@ -1126,7 +1128,6 @@ stats_tes <- function() {
  #  tes[grepl("#Unknown",name) & tsd_l == 5 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
  #  tes[grepl("#Unknown",name) & tsd_l == 6 & tsd_c >0.3 & type != "TIR", `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
   tes[grepl("#Unknown",name) & tsd_l > 3 & tsd_l < 7 & tsd_c >0.3 & type == "LTR" & length > 150 & lgap < 8 & rgap < 8 & TR2 == F, `:=`(name=paste0(gsub("#.*","",name),"#LTR",collapse=""),pass=T), by=.I]
-  lx("check4")
    # SINE reclassification by pA and size
   tes[grepl("#Unknown",name) & lente < 500 & pa < 5 & !is.na(pa), `:=`(name = paste0(gsub("#.*","",name),"#SINE",collapse=""),pass=T), by=.I]
    # Recover CACTA with short tirs
