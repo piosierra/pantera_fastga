@@ -568,7 +568,7 @@ return(segments_unique)
 cdhit1 <- function(sequences, threshold) {
   fname <- paste0(stri_rand_strings(1, 12, '[A-Z]'),gsub(">","",sequences[1]$name), collapse="")
   wfasta(sequences[,1:2],fname)
-  system(paste0("cd-hit-est -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
+  system(paste0("cd-hit-est -T 1 -d 0 -i ",fname, " -c ", opt$identity, " -o cl",fname, collapse = ""), ignore.stdout = T)
   hitcl <- fread(paste0("cl",fname,".clstr", collapse = ""), fill = T)
   hitcl[,tic:=substr(V2,1,1)]
   hitcl[,clus:=rleid(tic)]
