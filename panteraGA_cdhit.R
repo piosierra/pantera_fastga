@@ -220,7 +220,7 @@ read_pars <- function() {
   }
   
   if (is.null(opt$identity)) {
-    opt$identity <- 0.95
+    opt$identity <- 0.90
   }
   
   if (is.null(opt$identity2)) {
