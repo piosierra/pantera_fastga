@@ -703,6 +703,8 @@ cluster_results <- function() {
                                                      (nrow(segment_u) %/%
                                                       opt$cl_size +1))))
     #        lx(paste("Segment sets", start, "-", end, ":", length(segment_sets)))
+            consensi <- data.table(name = as.character(), 
+                                   seq = as.character())
             for (ss in 1:length(segment_sets)) {
               sg <- segment_sets[[ss]]
               if (nrow(sg)>1) {
@@ -730,8 +732,7 @@ cluster_results <- function() {
               # clusters <- clusters[!duplicated(clusters$V1)]
               # clusters[,n:=length(V1[[1]]), by=.I]
               # clusters <- clusters[clusters$n>=opt$min_cl,] 
-              consensi <- data.table(name = as.character(), 
-                                     seq = as.character())
+
           if ( nrow(sg_clus) > 0) {
             for (u in unique(sg_clus$clus)) {
               seqs_clust <- sg[name %in% unlist(sg_clus[clus==u]$name)]
@@ -782,7 +783,7 @@ cluster_results <- function() {
               cons <- substr(cons,cons_s,cons_e)
               cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
               lx(paste("cluster",u))
-              lx(nrow(sg))
+              lx(nrow(seqs_clust))
               lx(min(seqs_clust$len))
               lx(max(seqs_clust$len))
               lx(nchar(cons))
@@ -792,12 +793,13 @@ cluster_results <- function() {
                                                               seq = cons)))
             }
           } 
-        }
+              }
+            }
                   if (nrow(consensi) > 0) {
                     wfasta(consensi, paste0("consensi_", start, "_",
                                              end, ".fa"))
                   }
-            }
+            
               }
       }
     }
