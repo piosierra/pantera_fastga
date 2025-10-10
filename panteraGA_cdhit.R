@@ -808,7 +808,7 @@ cluster_results <- function() {
   }
   
   opt$Ns <- 0
-  # zones_interval <- 3000
+  zones_interval <- 300
   zones_interval_overlap <- 0
   cons_threshold <- 0.4
   saturation_threshold <- 0.6
@@ -826,10 +826,27 @@ cluster_results <- function() {
       lx(paste("Smallest segment:", min(segments_unique$len)))
       dir.create("loop_2", showWarnings = FALSE)
       setwd("loop_2")
-      segments_unique[,csum:=cumsum(len)]
-      segments_unique[,g:=csum %/% (opt$cl_size * 3000)]
-      zones <- segments_unique[,.(min(len),max(len)),g][,2:3]
-      zones <- asplit(zones,1)
+      # segments_unique[,csum:=cumsum(len)]
+      # segments_unique[,g:=csum %/% (opt$cl_size * 3000)]
+      # zones <- segments_unique[,.(min(len),max(len)),g][,2:3]
+      # zones <- asplit(zones,1)
+      
+      z <-
+        seq(
+          min(segments_unique$len),
+          max(segments_unique$len) + zones_interval,
+          zones_interval
+        )
+      if (length(z) < 2) {
+        zones <-
+          list(data.frame(
+            start = min(segments_unique$len),
+            end = max(segments_unique$len)
+          ))
+      } else {
+        zones <- asplit(data.frame(start = z[-length(z)], end = z[-1]), 1)
+      }
+      
       lx(paste("Processing:", length(zones), "windows"))
       loop_exit <- mclapply(
         rev(zones),
@@ -864,7 +881,7 @@ classify_tes <- function() {
     paste0(
       "getorf -sequence ",
       file,
-      " --outseq temp.orfs -minsize 300 &>/dev/null; blastp -num_threads ",opt$threads," -query temp.orfs -db ",
+      " --outseq temp.orfs -minsize 300 &>/dev/null; blastp -num_threads ",detectCores()," -query temp.orfs -db ",
       this.dir(),
       "/libs/RepeatPeps.lib -outfmt 6 -evalue 1e-1 > orfs.tbl"
     )
@@ -976,7 +993,7 @@ stats_tes <- function() {
   wfasta(tes[, c("name","seq")], paste0("tmp-tes"))
   system(paste0("makeblastdb -in tmp-tes -dbtype nucl 1> /dev/null"))
   te_data <- fread(cmd= paste0("blastn -query tmp-tes -db tmp-tes -task blastn -num_threads ", 
-                               opt$threads, 
+                               detectCores(), 
                                " -evalue 500 -outfmt 6 -word_size 11 -gapopen 4 -gapextend 1 -reward 1 -penalty -1"), header = F)
   if (nrow(te_data) > 0) {
     colnames(te_data) <-c("qseqid","sseqid", "pident" , "length","mismatch", 
@@ -1047,8 +1064,14 @@ stats_tes <- function() {
    te_data_mix[,rqgap:=.(lente.x-max(qstart,qend)), by=.I]
    te_data_mix[,lsgap:=.(min(sstart,send)-1), by=.I]
    te_data_mix[,rsgap:=.(lente.y-max(sstart,send)), by=.I]
-   ## Remove fully contained in good ones
+   ## Remove dups
    te_data_mix[,cover:=length/min(lente.x,lente.y), by=.I]
+   te_data_dups <- te_data_mix[cover>0.98 & pident>99 & abs((lente.y-lente.x) / max(lente.y,lente.x))<0.01 ]
+   te_data_dups[,uname:=paste0(c(qseqid,sseqid)[order(c(qseqid,sseqid))], collapse = ""), .I]
+   te_data_dups <- te_data_dups[order(orf1.x-orf1.y)]
+   dups_list <- te_data_dups[!duplicated(te_data_dups$uname)]$qseqid
+   te_data_mix <- te_data_mix[!(qseqid %in% dups_list)]
+   te_data_mix <- te_data_mix[!(sseqid %in% dups_list)]
  #  te_data_mix[,small:= (min(lente.x,lente.y) / max(lente.x,lente.y)) < 0.5,by=.I]
  #  smaller <- te_data_mix[cover>0.98 & pident>98 & small == T]
  #  smaller <- te_data_mix[cover>0.98 & pident>98
@@ -1060,7 +1083,7 @@ stats_tes <- function() {
   # te_data_mix <- te_data_mix[!grepl("Unknown", sseqid)]
   # te_data_mix <- te_data_mix[lsgap<10 | rsgap<10]
   # te_data_mix <- te_data_mix[lqgap<10 | rqgap<10]
-   te_data_mix <- te_data_mix[]
+  # te_data_mix <- te_data_mix[]
    ## Generate list of LINEs that are subsequence of a better one
    te_data_mix_line <- te_data_mix[(grepl("LINE",qseqid) | grepl("LINE",sseqid)) & pident> 90 & cover > 0.98]
    te_data_mix_line[,large:=qseqid]
@@ -1104,6 +1127,9 @@ stats_tes <- function() {
    tes$name <- ltr_merge$name
    
   ### Putting all together
+   # Remove the dups detected
+   tes <- tes[!(name %in% dups_list)]
+   lx(paste("Removed dups:", length(dups_list)))
    tes[,pass:=F]
    tes[,sf:=gsub(".*#","",name), by=.I]
    tes[name %in% good_line[!(good_line %in% small_line)], pass:=T]
