@@ -782,11 +782,11 @@ cluster_results <- function() {
               cons <- gsub("-","N",cons)
               cons <- substr(cons,cons_s,cons_e)
               cons <- paste0(strsplit(cons,"")[[1]][saturation[cons_s:cons_e]>saturation_threshold],collapse="")
-              lx(paste("cluster",u))
-              lx(nrow(seqs_clust))
-              lx(min(seqs_clust$len))
-              lx(max(seqs_clust$len))
-              lx(nchar(cons))
+              # lx(paste("cluster",u))
+              # lx(nrow(seqs_clust))
+              # lx(min(seqs_clust$len))
+              # lx(max(seqs_clust$len))
+              # lx(nchar(cons))
               nam <- paste0(">CONS-", start, "-", end, "-",u, "-", 
                             nchar(cons), "_clus",  length(clust_temp), "_tsdl",tsd_len , "_tsdc",tsds_conf, "_tsdm",tsds_motif,"@@")
               consensi <- rbindlist(list(consensi, data.table(name = nam, 
